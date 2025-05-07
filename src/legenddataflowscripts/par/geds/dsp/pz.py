@@ -11,9 +11,7 @@ from pygama.pargen.data_cleaning import get_cut_indexes
 from pygama.pargen.dsp_optimize import run_one_dsp
 from pygama.pargen.pz_correct import PZCorrect
 
-from .....convert_np import convert_dict_np_to_float
-from .....log import build_log
-from ....pulser_removal import get_pulser_mask
+from legenddataflowscripts.utils import get_pulser_mask, convert_dict_np_to_float, build_log
 
 
 def par_geds_dsp_pz() -> None:

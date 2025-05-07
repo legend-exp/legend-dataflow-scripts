@@ -14,9 +14,7 @@ from pygama.pargen.lq_cal import *  # noqa: F403
 from pygama.pargen.lq_cal import LQCal
 from pygama.pargen.utils import load_data
 
-from .....convert_np import convert_dict_np_to_float
-from .....log import build_log
-from ....pulser_removal import get_pulser_mask
+from legenddataflowscripts.utils import get_pulser_mask, build_log, convert_dict_np_to_float
 
 warnings.filterwarnings(action="ignore", category=RuntimeWarning)
 

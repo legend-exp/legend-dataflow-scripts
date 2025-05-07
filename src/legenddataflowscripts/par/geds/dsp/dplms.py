@@ -10,8 +10,7 @@ from dbetto.catalog import Props
 from lgdo import Array, Table
 from pygama.pargen.dplms_ge_dict import dplms_ge_dict
 
-from .....convert_np import convert_dict_np_to_float
-from .....log import build_log
+from legenddataflowscripts.utils import convert_dict_np_to_float, build_log
 
 
 def par_geds_dsp_dplms() -> None:

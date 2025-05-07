@@ -11,7 +11,7 @@ from dbetto.catalog import Props
 from pygama.pargen.data_cleaning import generate_cuts, get_cut_indexes
 from pygama.pargen.dsp_optimize import run_one_dsp
 
-from .....log import build_log
+from legenddataflowscripts.utils import build_log
 
 
 def par_geds_dsp_nopt() -> None:

@@ -165,7 +165,12 @@ def dataprod() -> None:
         "config_file", help="production cycle configuration file", type=str
     )
     parser_exec.add_argument(
-        "--system", help="system running on", default="local", type=str, required=False
+        "-s",
+        "--system",
+        help="system running on",
+        default="bare",
+        type=str,
+        required=False,
     )
     parser_exec.add_argument(
         "command", help="command to run within the container", type=str, nargs="+"

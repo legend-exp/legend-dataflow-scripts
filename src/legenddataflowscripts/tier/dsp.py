@@ -11,8 +11,7 @@ from dbetto.catalog import Props
 from dspeed import build_dsp
 from lgdo import lh5
 
-from ...alias_table import alias_table
-from ...log import build_log
+from legenddataflowscripts.utils import alias_table, build_log
 
 warnings.filterwarnings(action="ignore", category=RuntimeWarning)
 
