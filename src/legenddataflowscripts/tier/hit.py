@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import argparse
 import json
 import time
@@ -77,7 +79,8 @@ def build_tier_hit() -> None:
     start = time.time()
     Path(args.output).parent.mkdir(parents=True, exist_ok=True)
     build_hit(args.input, lh5_tables_config=channel_dict, outfile=args.output)
-    log.info(f"Hit built in {time.time() - start:.2f} seconds")
+    msg = f"Hit built in {time.time() - start:.2f} seconds"
+    log.info(msg)
     if args.alias_table is not None:
         log.info("Creating alias table")
         alias_table(args.output, args.alias_table)
@@ -141,4 +144,5 @@ def build_tier_hit_single_channel() -> None:
     start = time.time()
     Path(args.output).parent.mkdir(parents=True, exist_ok=True)
     build_hit(args.input, hit_config=channel_dict, outfile=args.output)
-    log.info(f"Hit built in {time.time() - start:.2f} seconds")
+    msg = f"Hit built in {time.time() - start:.2f} seconds"
+    log.info(msg)

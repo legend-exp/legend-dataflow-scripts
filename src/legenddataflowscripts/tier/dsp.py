@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import argparse
 import json
 import time
@@ -29,7 +31,6 @@ def _replace_list_with_array(dic):
 
 def build_dsp_wrapper(kwargs):
     build_dsp(**kwargs)
-    return
 
 
 def build_tier_dsp() -> None:
@@ -179,7 +180,8 @@ def build_tier_dsp() -> None:
             block_width=settings_dict.get("block_width", 16),
         )
 
-    log.info(f"Finished building DSP in {time.time() - start:.2f} seconds")
+    msg = f"Finished building DSP in {time.time() - start:.2f} seconds"
+    log.info(msg)
     if args.alias_table is not None:
         log.info("Creating alias table")
         alias_table(args.output, args.alias_table)
@@ -257,4 +259,5 @@ def build_tier_dsp_single_channel() -> None:
         buffer_len=settings_dict.get("buffer_len", 1000),
         block_width=settings_dict.get("block_width", 16),
     )
-    log.info(f"Finished building DSP in {time.time() - start:.2f} seconds")
+    msg = f"Finished building DSP in {time.time() - start:.2f} seconds"
+    log.info(msg)

@@ -1,4 +1,6 @@
-from datetime import datetime, timezone
+from __future__ import annotations
+
+from datetime import UTC, datetime
 from pathlib import Path
 
 from dbetto import TextDB
@@ -15,7 +17,7 @@ def pre_compile_catalog(validity_path: str | Path):
         entries[system] = []
         for entry in catalog.entries[system]:
             db = textdb.on(
-                datetime.fromtimestamp(entry.valid_from, tz=timezone.utc), system=system
+                datetime.fromtimestamp(entry.valid_from, tz=UTC), system=system
             )
             new_entry = Catalog.Entry(entry.valid_from, db)
             entries[system].append(new_entry)

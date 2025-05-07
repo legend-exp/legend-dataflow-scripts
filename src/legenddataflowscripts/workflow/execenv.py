@@ -7,8 +7,8 @@ import shlex
 import shutil
 import subprocess
 import sys
+from collections.abc import Iterable, Mapping
 from pathlib import Path
-from typing import Iterable, Mapping
 
 import colorlog
 import dbetto
@@ -245,7 +245,8 @@ def install(args) -> None:
     # otherwise use python-venv
     cmd_expr = [*cmd_prefix, python, "-m", "venv", path_install]
 
-    log.info(f"configuring virtual environment in {path_install}")
+    msg = f"configuring virtual environment in {path_install}"
+    log.info(msg)
     _runcmd(cmd_expr, cmd_env)
 
     cmd_expr = [

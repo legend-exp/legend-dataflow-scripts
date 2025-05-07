@@ -7,7 +7,6 @@ import warnings
 from datetime import datetime
 from pathlib import Path
 
-import lgdo.lh5 as lh5
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
@@ -16,6 +15,7 @@ import pygama.math.histogram as pgh
 from dbetto import TextDB
 from dbetto.catalog import Props
 from legendmeta import LegendMetadata
+from lgdo import lh5
 from matplotlib.colors import LogNorm
 from pygama.math.distributions import nb_poly
 from pygama.pargen.data_cleaning import get_mode_stdev
@@ -23,13 +23,17 @@ from pygama.pargen.energy_cal import FWHMLinear, FWHMQuadratic, HPGeCalibration
 from pygama.pargen.utils import load_data
 from scipy.stats import binned_statistic
 
-from legenddataflowscripts.utils import get_pulser_mask, build_log, convert_dict_np_to_float
+from legenddataflowscripts.utils import (
+    build_log,
+    convert_dict_np_to_float,
+    get_pulser_mask,
+)
 
 mpl.use("agg")
 sto = lh5.LH5Store()
 
 warnings.filterwarnings(action="ignore", category=RuntimeWarning)
-warnings.filterwarnings(action="ignore", category=np.RankWarning)
+warnings.filterwarnings(action="ignore", category=np.exceptions.RankWarning)
 
 
 def plot_2614_timemap(
@@ -137,15 +141,13 @@ def plot_pulser_timemap(
 def get_median(x):
     if len(x[~np.isnan(x)]) >= 10:
         return np.nan
-    else:
-        return np.nanpercentile(x, 50)
+    return np.nanpercentile(x, 50)
 
 
 def get_err(x):
     if len(x[~np.isnan(x)]) >= 10:
         return np.nan
-    else:
-        return np.nanvar(x) / np.sqrt(len(x))
+    return np.nanvar(x) / np.sqrt(len(x))
 
 
 def bin_pulser_stability(
@@ -379,67 +381,66 @@ def monitor_parameters(files, lh5_path, parameters):
 def get_results_dict(ecal_class, data, cal_energy_param, selection_string):
     if np.isnan(ecal_class.pars).all():
         return {}
+    results_dict = copy.deepcopy(ecal_class.results["hpge_fit_energy_peaks_1"])
+
+    if "FWHMLinear" in results_dict:
+        fwhm_linear = results_dict["FWHMLinear"]
+        fwhm_linear["function"] = fwhm_linear["function"].__name__
+        fwhm_linear["parameters"] = fwhm_linear["parameters"].to_dict()
+        fwhm_linear["uncertainties"] = fwhm_linear["uncertainties"].to_dict()
+        fwhm_linear["cov"] = fwhm_linear["cov"].tolist()
     else:
-        results_dict = copy.deepcopy(ecal_class.results["hpge_fit_energy_peaks_1"])
+        fwhm_linear = None
 
-        if "FWHMLinear" in results_dict:
-            fwhm_linear = results_dict["FWHMLinear"]
-            fwhm_linear["function"] = fwhm_linear["function"].__name__
-            fwhm_linear["parameters"] = fwhm_linear["parameters"].to_dict()
-            fwhm_linear["uncertainties"] = fwhm_linear["uncertainties"].to_dict()
-            fwhm_linear["cov"] = fwhm_linear["cov"].tolist()
-        else:
-            fwhm_linear = None
+    if "FWHMQuadratic" in results_dict:
+        fwhm_quad = results_dict["FWHMQuadratic"]
+        fwhm_quad["function"] = fwhm_quad["function"].__name__
+        fwhm_quad["parameters"] = fwhm_quad["parameters"].to_dict()
+        fwhm_quad["uncertainties"] = fwhm_quad["uncertainties"].to_dict()
+        fwhm_quad["cov"] = fwhm_quad["cov"].tolist()
+    else:
+        fwhm_quad = None
 
-        if "FWHMQuadratic" in results_dict:
-            fwhm_quad = results_dict["FWHMQuadratic"]
-            fwhm_quad["function"] = fwhm_quad["function"].__name__
-            fwhm_quad["parameters"] = fwhm_quad["parameters"].to_dict()
-            fwhm_quad["uncertainties"] = fwhm_quad["uncertainties"].to_dict()
-            fwhm_quad["cov"] = fwhm_quad["cov"].tolist()
-        else:
-            fwhm_quad = None
+    pk_dict = results_dict["peak_parameters"]
 
-        pk_dict = results_dict["peak_parameters"]
+    for _, dic in pk_dict.items():
+        dic["function"] = dic["function"].name
+        dic["parameters"] = dic["parameters"].to_dict()
+        dic["uncertainties"] = dic["uncertainties"].to_dict()
+        dic.pop("covariance")
 
-        for _, dic in pk_dict.items():
-            dic["function"] = dic["function"].name
-            dic["parameters"] = dic["parameters"].to_dict()
-            dic["uncertainties"] = dic["uncertainties"].to_dict()
-            dic.pop("covariance")
-
-        return {
-            "total_fep": len(
-                data.query(f"{cal_energy_param}>2604&{cal_energy_param}<2624")
-            ),
-            "total_sep": len(
-                data.query(f"{cal_energy_param}>2095&{cal_energy_param}<2115")
-            ),
-            "total_dep": len(
-                data.query(f"{cal_energy_param}>1587&{cal_energy_param}<1597")
-            ),
-            "pass_fep": len(
-                data.query(
-                    f"{cal_energy_param}>2604&{cal_energy_param}<2624&{selection_string}"
-                )
-            ),
-            "pass_sep": len(
-                data.query(
-                    f"{cal_energy_param}>2095&{cal_energy_param}<2115&{selection_string}"
-                )
-            ),
-            "pass_dep": len(
-                data.query(
-                    f"{cal_energy_param}>1587&{cal_energy_param}<1597&{selection_string}"
-                )
-            ),
-            "eres_linear": fwhm_linear,
-            "eres_quadratic": fwhm_quad,
-            # "calibration_parameters":results_dict["calibration_parameters"].to_dict(),
-            # "calibration_uncertainty":results_dict["calibration_uncertainties"].to_dict(),
-            "fitted_peaks": ecal_class.peaks_kev.tolist(),
-            "pk_fits": pk_dict,
-        }
+    return {
+        "total_fep": len(
+            data.query(f"{cal_energy_param}>2604&{cal_energy_param}<2624")
+        ),
+        "total_sep": len(
+            data.query(f"{cal_energy_param}>2095&{cal_energy_param}<2115")
+        ),
+        "total_dep": len(
+            data.query(f"{cal_energy_param}>1587&{cal_energy_param}<1597")
+        ),
+        "pass_fep": len(
+            data.query(
+                f"{cal_energy_param}>2604&{cal_energy_param}<2624&{selection_string}"
+            )
+        ),
+        "pass_sep": len(
+            data.query(
+                f"{cal_energy_param}>2095&{cal_energy_param}<2115&{selection_string}"
+            )
+        ),
+        "pass_dep": len(
+            data.query(
+                f"{cal_energy_param}>1587&{cal_energy_param}<1597&{selection_string}"
+            )
+        ),
+        "eres_linear": fwhm_linear,
+        "eres_quadratic": fwhm_quad,
+        # "calibration_parameters":results_dict["calibration_parameters"].to_dict(),
+        # "calibration_uncertainty":results_dict["calibration_uncertainties"].to_dict(),
+        "fitted_peaks": ecal_class.peaks_kev.tolist(),
+        "pk_fits": pk_dict,
+    }
 
 
 def par_geds_hit_ecal() -> None:
@@ -570,7 +571,7 @@ def par_geds_hit_ecal() -> None:
     full_object_dict = {}
 
     for energy_param, cal_energy_param in zip(
-        kwarg_dict["energy_params"], cal_energy_params
+        kwarg_dict["energy_params"], cal_energy_params, strict=False
     ):
         e_uncal = data.query(selection_string)[energy_param].to_numpy()
 

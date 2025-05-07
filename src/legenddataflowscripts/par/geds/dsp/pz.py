@@ -1,17 +1,23 @@
+from __future__ import annotations
+
 import argparse
 import copy
 import pickle as pkl
 from pathlib import Path
 
-import lgdo.lh5 as lh5
 import numpy as np
 from dbetto import TextDB
 from dbetto.catalog import Props
+from lgdo import lh5
 from pygama.pargen.data_cleaning import get_cut_indexes
 from pygama.pargen.dsp_optimize import run_one_dsp
 from pygama.pargen.pz_correct import PZCorrect
 
-from legenddataflowscripts.utils import get_pulser_mask, convert_dict_np_to_float, build_log
+from legenddataflowscripts.utils import (
+    build_log,
+    convert_dict_np_to_float,
+    get_pulser_mask,
+)
 
 
 def par_geds_dsp_pz() -> None:
@@ -74,7 +80,8 @@ def par_geds_dsp_pz() -> None:
             else:
                 input_file = args.raw_files
 
-        log.debug(f"Reading Data for {args.raw_table_name} from:")
+        msg = f"Reading Data for {args.raw_table_name} from:"
+        log.debug(msg)
         log.debug(input_file)
 
         data = lh5.read(
@@ -106,7 +113,8 @@ def par_geds_dsp_pz() -> None:
         cuts = np.where(
             (data.daqenergy.to_numpy() > threshold) & (~mask) & (~is_recovering)
         )[0]
-        log.debug(f"{len(cuts)} events passed threshold and pulser cuts")
+        msg = f"{len(cuts)} events passed threshold and pulser cuts"
+        log.debug(msg)
         log.debug(cuts)
         tb_data = lh5.read(
             args.raw_table_name,
@@ -129,7 +137,8 @@ def par_geds_dsp_pz() -> None:
         if cut_parameters is not None:
             idxs = get_cut_indexes(tb_out, cut_parameters=cut_parameters)
             log.debug("Applied cuts")
-            log.debug(f"{len(idxs)} events passed cuts")
+            msg = f"{len(idxs)} events passed cuts"
+            log.debug(msg)
             tb_data = lh5.read(
                 args.raw_table_name,
                 input_file,
@@ -147,9 +156,8 @@ def par_geds_dsp_pz() -> None:
             tau.get_single_decay_constant(
                 tb_data, kwarg_dict.get("slope_param", "tail_slope")
             )
-            log.debug(
-                f"Found tau: {tau.output_dict['pz']['tau']}+- {tau.output_dict['pz']['tau_err']}"
-            )
+            msg = f"Found tau: {tau.output_dict['pz']['tau']}+- {tau.output_dict['pz']['tau_err']}"
+            log.debug(msg)
         elif kwarg_dict["mode"] == "double":
             tau.get_dpz_decay_constants(
                 tb_data,
@@ -161,9 +169,8 @@ def par_geds_dsp_pz() -> None:
             )
             log.debug("found dpz constants : ")
             for entry in ["tau1", "tau2", "frac"]:
-                log.debug(
-                    f"{entry}:{tau.output_dict['pz'][entry]}+- {tau.output_dict['pz'][f'{entry}_err']}"
-                )
+                msg = f"{entry}:{tau.output_dict['pz'][entry]}+- {tau.output_dict['pz'][f'{entry}_err']}"
+                log.debug(msg)
         else:
             msg = f"Unknown mode: {kwarg_dict['mode']}, must be either single or double"
             raise ValueError(msg)

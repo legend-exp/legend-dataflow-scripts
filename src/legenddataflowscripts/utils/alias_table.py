@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 
 import h5py
@@ -19,7 +21,7 @@ def alias_table(file, mapping):
     with h5py.File(file, "a") as f:
         for raw_id, alias in mapping.items():
             if raw_id in f:
-                if isinstance(alias, (list, tuple)):
+                if isinstance(alias, list | tuple):
                     for a in alias:
                         f[a] = f[raw_id]
                 else:

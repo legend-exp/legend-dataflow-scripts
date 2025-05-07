@@ -1,16 +1,18 @@
+from __future__ import annotations
+
 import argparse
 import pickle as pkl
 import time
 import warnings
 from pathlib import Path
 
-import lgdo.lh5 as lh5
 import numpy as np
 import pygama.pargen.energy_optimisation as om  # noqa: F401
 import sklearn.gaussian_process.kernels as ker
 from dbetto import TextDB
 from dbetto.catalog import Props
 from dspeed.units import unit_registry as ureg
+from lgdo import lh5
 from pygama.math.distributions import hpge_peak
 from pygama.pargen.dsp_optimize import (
     BayesianOptimizer,
@@ -21,7 +23,7 @@ from pygama.pargen.dsp_optimize import (
 from legenddataflowscripts.utils import build_log
 
 warnings.filterwarnings(action="ignore", category=RuntimeWarning)
-warnings.filterwarnings(action="ignore", category=np.RankWarning)
+warnings.filterwarnings(action="ignore", category=np.exceptions.RankWarning)
 
 
 def par_geds_dsp_eopt() -> None:
@@ -113,9 +115,10 @@ def par_geds_dsp_eopt() -> None:
         tb_data = lh5.read(args.raw_table_name, args.peak_file, idx=ids)
 
         t1 = time.time()
-        log.info(f"Data Loaded in {(t1 - t0) / 60} minutes")
+        msg = f"Data Loaded in {(t1 - t0) / 60} minutes"
+        log.info(msg)
 
-        if isinstance(dsp_config, (str, list)):
+        if isinstance(dsp_config, str | list):
             dsp_config = Props.read_from(dsp_config)
 
         dsp_config["outputs"] = ["tp_99", "tp_0_est", "dt_eff"]
@@ -183,7 +186,8 @@ def par_geds_dsp_eopt() -> None:
             db_dict["zac"]["sigma"] = f"{x[0]}*us"
             db_dict["etrap"]["rise"] = f"{x[0]}*us"
 
-            log.info(f"Initialising values {i + 1} : {db_dict}")
+            msg = f"Initialising values {i + 1} : {db_dict}"
+            log.info(msg)
 
             tb_out = run_one_dsp(tb_data, dsp_config, db_dict=db_dict, verbosity=0)
 
@@ -202,7 +206,8 @@ def par_geds_dsp_eopt() -> None:
             sample_y_trap.append(res[out_field])
             err_y_trap.append(res[out_err_field])
 
-            log.info(f"{i + 1} Finished")
+            msg = f"{i + 1} Finished"
+            log.info(msg)
 
         if np.isnan(sample_y_cusp).all():
             max_cusp = opt_dict["nan_default"]
@@ -318,7 +323,8 @@ def par_geds_dsp_eopt() -> None:
         # db_dict.update(out_param_dict)
 
         t2 = time.time()
-        log.info(f"Optimiser finished in {(t2 - t1) / 60} minutes")
+        msg = f"Optimiser finished in {(t2 - t1) / 60} minutes"
+        log.info(msg)
 
         out_alpha_dict = {}
         out_alpha_dict["cuspEmax_ctc"] = {

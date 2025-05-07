@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import argparse
 import json
 import time
@@ -6,16 +8,16 @@ from bisect import bisect_left
 from pathlib import Path
 
 import lgdo
-import lgdo.lh5 as lh5
 import numpy as np
 import pygama.math.histogram as pgh
 import pygama.pargen.energy_cal as pgc
 from dbetto import TextDB
 from dbetto.catalog import Props
+from lgdo import lh5
 from pygama.pargen.data_cleaning import generate_cuts, get_keys
 from pygama.pargen.dsp_optimize import run_one_dsp
 
-from legenddataflowscripts.utils import get_pulser_mask, build_log
+from legenddataflowscripts.utils import build_log, get_pulser_mask
 
 warnings.filterwarnings(action="ignore", category=RuntimeWarning)
 
@@ -186,14 +188,15 @@ def par_geds_dsp_evtsel() -> None:
         rough_energy = tb["daqenergy_cal"].nda
 
         masks = {}
-        for peak, kev_width in zip(peaks_kev, kev_widths):
+        for peak, kev_width in zip(peaks_kev, kev_widths, strict=False):
             e_mask = (
                 (rough_energy > peak - 1.1 * kev_width[0])
                 & (rough_energy < peak + 1.1 * kev_width[0])
                 & (~mask)
             )
             masks[peak] = np.where(e_mask & (~is_recovering))[0]
-            log.debug(f"{len(masks[peak])} events found in energy range for {peak}")
+            msg = f"{len(masks[peak])} events found in energy range for {peak}"
+            log.debug(msg)
 
         input_data = lh5.read(
             f"{lh5_path}", raw_files, n_rows=10000, idx=np.where(~mask)[0]
@@ -212,12 +215,13 @@ def par_geds_dsp_evtsel() -> None:
 
         if cut_parameters is not None:
             cut_dict = generate_cuts(tb_data, cut_parameters)
-            log.debug(f"Cuts are calculated: {json.dumps(cut_dict, indent=2)}")
+            msg = f"Cuts are calculated: {json.dumps(cut_dict, indent=2)}"
+            log.debug(msg)
         else:
             cut_dict = None
 
         pk_dicts = {}
-        for peak, kev_width in zip(peaks_kev, kev_widths):
+        for peak, kev_width in zip(peaks_kev, kev_widths, strict=False):
             pk_dicts[peak] = {
                 "idxs": (masks[peak],),
                 "n_rows_read": 0,
@@ -252,7 +256,8 @@ def par_geds_dsp_evtsel() -> None:
                         n_rows_read_i = len(peak_dict["obj_buf"])
 
                         peak_dict["n_rows_read"] += n_rows_read_i
-                        log.debug(f"{peak}: {peak_dict['n_rows_read']}")
+                        msg = f"{peak}: {peak_dict['n_rows_read']}"
+                        log.debug(msg)
                         peak_dict["obj_buf_start"] += n_rows_read_i
                     if peak_dict["n_rows_read"] >= 10000 or file == raw_files[-1]:
                         if "e_lower_lim" not in peak_dict:
@@ -270,8 +275,7 @@ def par_geds_dsp_evtsel() -> None:
                                 * len(energy) ** (-1 / 3)
                             )
 
-                            if init_bin_width > 2:
-                                init_bin_width = 2
+                            init_bin_width = min(init_bin_width, 2)
 
                             hist, bins, var = pgh.get_hist(
                                 energy,
@@ -323,9 +327,8 @@ def par_geds_dsp_evtsel() -> None:
                             e_upper_lim = (
                                 mu + (peak_dict["kev_width"][1]) / updated_adc_to_kev
                             )
-                            log.info(
-                                f"{peak}: lower lim is :{e_lower_lim}, upper lim is {e_upper_lim}"
-                            )
+                            msg = f"{peak}: lower lim is :{e_lower_lim}, upper lim is {e_upper_lim}"
+                            log.info(msg)
                             peak_dict["e_lower_lim"] = e_lower_lim
                             peak_dict["e_upper_lim"] = e_upper_lim
                             peak_dict["ecal_par"] = updated_adc_to_kev
@@ -351,49 +354,47 @@ def par_geds_dsp_evtsel() -> None:
                             peak_dict["obj_buf"] = None
                             peak_dict["obj_buf_start"] = 0
                             peak_dict["n_events"] = n_wfs
-                            log.debug(
-                                f"found {peak_dict['n_events']} events for {peak}"
+                            msg = f"found {peak_dict['n_events']} events for {peak}"
+                            log.debug(msg)
+                        elif (
+                            peak_dict["obj_buf"] is not None
+                            and len(peak_dict["obj_buf"]) > 0
+                        ):
+                            tb_out = run_one_dsp(
+                                peak_dict["obj_buf"], dsp_config, db_dict=db_dict
                             )
-                        else:
-                            if (
-                                peak_dict["obj_buf"] is not None
-                                and len(peak_dict["obj_buf"]) > 0
-                            ):
-                                tb_out = run_one_dsp(
-                                    peak_dict["obj_buf"], dsp_config, db_dict=db_dict
+                            out_tbl, n_wfs = get_out_data(
+                                peak_dict["obj_buf"],
+                                tb_out,
+                                cut_dict,
+                                peak_dict["e_lower_lim"],
+                                peak_dict["e_upper_lim"],
+                                peak_dict["ecal_par"],
+                                raw_dict,
+                                int(peak),
+                                final_cut_field=final_cut_field,
+                                energy_param=energy_parameter,
+                            )
+                            peak_dict["n_events"] += n_wfs
+                            lh5.write(
+                                out_tbl,
+                                name=lh5_path,
+                                lh5_file=temp_output,
+                                wo_mode="a",
+                            )
+                            peak_dict["obj_buf"] = None
+                            peak_dict["obj_buf_start"] = 0
+                            msg = f"found {peak_dict['n_events']} events for {peak}"
+                            log.debug(msg)
+                            if peak_dict["n_events"] >= n_events:
+                                peak_dict["idxs"] = None
+                                msg = (
+                                    f"{peak} has reached the required number of events"
                                 )
-                                out_tbl, n_wfs = get_out_data(
-                                    peak_dict["obj_buf"],
-                                    tb_out,
-                                    cut_dict,
-                                    peak_dict["e_lower_lim"],
-                                    peak_dict["e_upper_lim"],
-                                    peak_dict["ecal_par"],
-                                    raw_dict,
-                                    int(peak),
-                                    final_cut_field=final_cut_field,
-                                    energy_param=energy_parameter,
-                                )
-                                peak_dict["n_events"] += n_wfs
-                                lh5.write(
-                                    out_tbl,
-                                    name=lh5_path,
-                                    lh5_file=temp_output,
-                                    wo_mode="a",
-                                )
-                                peak_dict["obj_buf"] = None
-                                peak_dict["obj_buf_start"] = 0
-                                log.debug(
-                                    f"found {peak_dict['n_events']} events for {peak}"
-                                )
-                                if peak_dict["n_events"] >= n_events:
-                                    peak_dict["idxs"] = None
-                                    log.debug(
-                                        f"{peak} has reached the required number of events"
-                                    )
+                                log.debug(msg)
 
     else:
         Path(temp_output).touch()
-
-    log.debug(f"event selection completed in {time.time() - t0} seconds")
+    msg = f"event selection completed in {time.time() - t0} seconds"
+    log.debug(msg)
     Path(temp_output).rename(args.peak_file)

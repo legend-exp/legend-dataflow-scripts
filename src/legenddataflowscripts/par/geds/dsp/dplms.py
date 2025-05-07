@@ -1,16 +1,17 @@
+from __future__ import annotations
+
 import argparse
 import pickle as pkl
 import time
 from pathlib import Path
 
-import lgdo.lh5 as lh5
 import numpy as np
 from dbetto import TextDB
 from dbetto.catalog import Props
-from lgdo import Array, Table
+from lgdo import Array, Table, lh5
 from pygama.pargen.dplms_ge_dict import dplms_ge_dict
 
-from legenddataflowscripts.utils import convert_dict_np_to_float, build_log
+from legenddataflowscripts.utils import build_log, convert_dict_np_to_float
 
 
 def par_geds_dsp_dplms() -> None:
@@ -66,9 +67,8 @@ def par_geds_dsp_dplms() -> None:
             idx=idxs,
         )
         t1 = time.time()
-        log.info(
-            f"Time to load fft data {(t1 - t0):.2f} s, total events {len(raw_fft)}"
-        )
+        msg = f"Time to load fft data {(t1 - t0):.2f} s, total events {len(raw_fft)}"
+        log.info(msg)
 
         log.info("\nRunning event selection")
         peaks_kev = np.array(dplms_dict["peaks_kev"])
@@ -81,11 +81,10 @@ def par_geds_dsp_dplms() -> None:
         # idx_list = [np.where(peaks == peak)[0] for peak in peaks_rounded]
 
         raw_cal = lh5.read(args.raw_table_name, args.peak_file, idx=ids)
-        log.info(
-            f"Time to run event selection {(time.time() - t1):.2f} s, total events {len(raw_cal)}"
-        )
+        msg = f"Time to run event selection {(time.time() - t1):.2f} s, total events {len(raw_cal)}"
+        log.info(msg)
 
-        if isinstance(dsp_config, (str, list)):
+        if isinstance(dsp_config, str | list):
             dsp_config = Props.read_from(dsp_config)
 
         if args.plot_path:
@@ -116,8 +115,8 @@ def par_geds_dsp_dplms() -> None:
         out_dict["dplms"]["coefficients"] = (
             f"loadlh5('{args.lh5_path}', '{args.channel}/dplms/coefficients')"
         )
-
-        log.info(f"DPLMS creation finished in {(time.time() - t0) / 60} minutes")
+        msg = f"DPLMS creation finished in {(time.time() - t0) / 60} minutes"
+        log.info(msg)
     else:
         out_dict = {}
         dplms_pars = Table(col_dict={"coefficients": Array([])})

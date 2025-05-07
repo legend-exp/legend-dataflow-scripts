@@ -1,13 +1,15 @@
+from __future__ import annotations
+
 import argparse
 import pickle as pkl
 import time
 from pathlib import Path
 
-import lgdo.lh5 as lh5
 import numpy as np
 import pygama.pargen.noise_optimization as pno
 from dbetto import TextDB
 from dbetto.catalog import Props
+from lgdo import lh5
 from pygama.pargen.data_cleaning import generate_cuts, get_cut_indexes
 from pygama.pargen.dsp_optimize import run_one_dsp
 
@@ -62,9 +64,11 @@ def par_geds_dsp_nopt() -> None:
             args.raw_table_name, raw_files, n_rows=opt_dict["n_events"], idx=idxs
         )
         t1 = time.time()
-        log.info(f"Time to open raw files {t1 - t0:.2f} s, n. baselines {len(tb_data)}")
+        msg = f"Time to open raw files {t1 - t0:.2f} s, n. baselines {len(tb_data)}"
+        log.info(msg)
 
-        log.info(f"Select baselines {len(tb_data)}")
+        msg = f"Select baselines {len(tb_data)}"
+        log.info(msg)
         dsp_data = run_one_dsp(tb_data, dsp_config)
         cut_dict = generate_cuts(dsp_data, cut_dict=opt_dict.pop("cut_pars"))
         cut_idxs = get_cut_indexes(dsp_data, cut_dict)
@@ -74,9 +78,10 @@ def par_geds_dsp_nopt() -> None:
             n_rows=opt_dict.pop("n_events"),
             idx=idxs[cut_idxs],
         )
-        log.info(f"... {len(tb_data)} baselines after cuts")
+        msg = f"... {len(tb_data)} baselines after cuts"
+        log.info(msg)
 
-        if isinstance(dsp_config, (str, list)):
+        if isinstance(dsp_config, str | list):
             dsp_config = Props.read_from(dsp_config)
 
         if args.plot_path:
@@ -94,7 +99,8 @@ def par_geds_dsp_nopt() -> None:
             )
 
         t2 = time.time()
-        log.info(f"Optimiser finished in {(t2 - t0) / 60} minutes")
+        msg = f"Optimiser finished in {(t2 - t0) / 60} minutes"
+        log.info(msg)
     else:
         out_dict = {}
         plot_dict = {}

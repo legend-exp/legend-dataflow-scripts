@@ -4,6 +4,8 @@ for substituting the pathvar in the config, also the conversion
 from timestamp to unix time
 """
 
+from __future__ import annotations
+
 import copy
 import os
 import re
@@ -16,10 +18,8 @@ def subst_vars_impl(x, var_values, ignore_missing=False):
         if "$" in x:
             if ignore_missing:
                 return string.Template(x).safe_substitute(var_values)
-            else:
-                return string.Template(x).substitute(var_values)
-        else:
-            return x
+            return string.Template(x).substitute(var_values)
+        return x
     if isinstance(x, dict):
         for key in x:
             value = x[key]
@@ -34,8 +34,7 @@ def subst_vars_impl(x, var_values, ignore_missing=False):
             if new_value is not value:
                 x[i] = new_value
         return x
-    else:
-        return x
+    return x
 
 
 def subst_vars(
