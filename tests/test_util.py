@@ -12,7 +12,7 @@ from legenddataflowscripts.workflow import (
     subst_vars_in_snakemake_config,
 )
 
-testprod = Path(__file__).parent / "dummy_cycle"
+testprod = Path(__file__).parent
 config_filename = testprod / "dataflow-config.yaml"
 
 with (config_filename).open() as r:
