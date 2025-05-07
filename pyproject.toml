@@ -67,12 +67,12 @@ dependencies = [
 [project.optional-dependencies]
 # these are needed to run the data production
 test = [
-    "legenddataflowscripts",
+    "legend_dataflow_scripts",
     "pytest>=6",
     "pytest-cov>=3",
 ]
 dev = [
-    "legenddataflowscripts[test]",
+    "legend_dataflow_scripts[test]",
     "pre-commit",
 ]
 docs = [

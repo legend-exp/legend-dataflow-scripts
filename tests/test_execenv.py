@@ -1,7 +1,10 @@
+from __future__ import annotations
+
 import os
 
 import pytest
 from dbetto import AttrsDict
+
 from legenddataflowscripts.workflow import execenv
 
 os.environ["XDG_RUNTIME_DIR"] = "whatever"
