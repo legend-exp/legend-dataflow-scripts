@@ -13,7 +13,7 @@ from legenddataflowscripts.workflow import (
 )
 
 testprod = Path(__file__).parent / "dummy_cycle"
-config_filename = testprod / "config.yaml"
+config_filename = testprod / "dataflow-config.yaml"
 
 with (config_filename).open() as r:
     setup = yaml.safe_load(r)
