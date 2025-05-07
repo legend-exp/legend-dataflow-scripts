@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from execenv import execenv_prefix, execenv_pyexe
-
+from .execenv import execenv_prefix, execenv_pyexe
 from .utils import (
     as_ro,
     set_last_rule_name,
