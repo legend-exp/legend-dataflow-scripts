@@ -23,7 +23,7 @@ where = ["src"]
 write_to = "src/legenddataflowscripts/_version.py"
 
 [project]
-name = "legend_dataflow_scripts"
+name = "legend-dataflow-scripts"
 description = "Python package for the processing scripts for LEGEND-200 data"
 authors = [
     {name = "George Marshall", email = "ggmarsh@uw.edu"},
@@ -67,12 +67,12 @@ dependencies = [
 [project.optional-dependencies]
 # these are needed to run the data production
 test = [
-    "legend_dataflow_scripts",
+    "legend-dataflow-scripts",
     "pytest>=6",
     "pytest-cov>=3",
 ]
 dev = [
-    "legend_dataflow_scripts[test]",
+    "legend-dataflow-scripts[test]",
     "pre-commit",
 ]
 docs = [
