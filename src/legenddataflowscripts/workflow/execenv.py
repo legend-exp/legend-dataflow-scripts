@@ -112,17 +112,17 @@ def execenv_pyexe(
     return cmdline, cmdenv
 
 
-def dataprod() -> None:
-    """dataprod's CLI for installing and loading the software in the data production environment.
+def dataflow() -> None:
+    """dataflow's CLI for installing and loading the software in the data production environment.
 
     .. code-block:: console
 
-      $ dataprod --help
-      $ dataprod install --help  # help section for a specific sub-command
+      $ dataflow --help
+      $ dataflow install --help  # help section for a specific sub-command
     """
 
     parser = argparse.ArgumentParser(
-        prog="dataprod", description="dataprod's command-line interface"
+        prog="dataflow", description="dataflow's command-line interface"
     )
 
     parser.add_argument(
@@ -130,6 +130,7 @@ def dataprod() -> None:
     )
 
     subparsers = parser.add_subparsers()
+
     parser_install = subparsers.add_parser(
         "install", help="install user software in data production environment"
     )
@@ -177,6 +178,10 @@ def dataprod() -> None:
     )
     parser_exec.set_defaults(func=cmdexec)
 
+    if len(sys.argv) < 2:
+        parser.print_usage(sys.stderr)
+        sys.exit(1)
+
     args = parser.parse_args()
 
     if args.verbose:
@@ -191,7 +196,8 @@ def dataprod() -> None:
         logger.setLevel(logging.DEBUG)
         logger.addHandler(handler)
 
-    args.func(args)
+    if args.func:
+        args.func(args)
 
 
 def install(args) -> None:
@@ -208,9 +214,9 @@ def install(args) -> None:
 
     .. code-block:: console
 
-      $ dataprod install config.yaml
-      $ dataprod install --editable config.yaml  # install legend-dataflow in editable mode
-      $ dataprod install --remove config.yaml  # remove install directory
+      $ dataflow install config.yaml
+      $ dataflow install --editable config.yaml  # install legend-dataflow in editable mode
+      $ dataflow install --remove config.yaml  # remove install directory
     """
     config_dict = AttrsDict(dbetto.utils.load_dict(args.config_file))
     config_loc = Path(args.config_file).resolve().parent

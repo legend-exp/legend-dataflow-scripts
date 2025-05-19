@@ -85,7 +85,7 @@ docs = [
 ]
 
 [project.scripts]
-dataprod                = "legenddataflowscripts.workflow.execenv:dataprod"
+dataflow                = "legenddataflowscripts.workflow.execenv:dataflow"
 build-filedb            = "legenddataflowscripts.workflow.filedb:build_filedb"
 build-tier-dsp          = "legenddataflowscripts.tier.dsp:build_tier_dsp"
 build-tier-hit          = "legenddataflowscripts.tier.hit:build_tier_hit"
