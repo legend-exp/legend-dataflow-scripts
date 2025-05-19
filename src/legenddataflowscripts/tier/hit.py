@@ -10,7 +10,7 @@ from legendmeta import TextDB
 from lgdo import lh5
 from pygama.hit.build_hit import build_hit
 
-from legenddataflowscripts.utils import alias_table, build_log
+from ..utils import alias_table, build_log
 
 
 def build_tier_hit() -> None:

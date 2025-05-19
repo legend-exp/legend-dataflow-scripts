@@ -12,7 +12,7 @@ from pygama.pargen.AoE_cal import *  # noqa: F403
 from pygama.pargen.AoE_cal import CalAoE, Pol1, SigmaFit, aoe_peak
 from pygama.pargen.utils import load_data
 
-from legenddataflowscripts.utils import (
+from ..utils import (
     build_log,
     convert_dict_np_to_float,
     get_pulser_mask,

@@ -13,7 +13,7 @@ from lgdo import lh5
 from pygama.pargen.data_cleaning import generate_cuts, get_cut_indexes
 from pygama.pargen.dsp_optimize import run_one_dsp
 
-from legenddataflowscripts.utils import build_log
+from ..utils import build_log
 
 
 def par_geds_dsp_nopt() -> None:
