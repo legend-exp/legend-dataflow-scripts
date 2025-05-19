@@ -17,7 +17,7 @@ from pygama.pargen.data_cleaning import (
 )
 from pygama.pargen.utils import load_data
 
-from ..utils import (
+from ....utils import (
     build_log,
     convert_dict_np_to_float,
     get_pulser_mask,

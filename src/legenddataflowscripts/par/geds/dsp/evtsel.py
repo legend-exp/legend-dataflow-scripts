@@ -17,7 +17,7 @@ from lgdo import lh5
 from pygama.pargen.data_cleaning import generate_cuts, get_keys
 from pygama.pargen.dsp_optimize import run_one_dsp
 
-from ..utils import build_log, get_pulser_mask
+from ....utils import build_log, get_pulser_mask
 
 warnings.filterwarnings(action="ignore", category=RuntimeWarning)
 

@@ -23,7 +23,7 @@ from pygama.pargen.energy_cal import FWHMLinear, FWHMQuadratic, HPGeCalibration
 from pygama.pargen.utils import load_data
 from scipy.stats import binned_statistic
 
-from ..utils import (
+from ....utils import (
     build_log,
     convert_dict_np_to_float,
     get_pulser_mask,

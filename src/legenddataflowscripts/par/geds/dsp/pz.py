@@ -13,7 +13,7 @@ from pygama.pargen.data_cleaning import get_cut_indexes
 from pygama.pargen.dsp_optimize import run_one_dsp
 from pygama.pargen.pz_correct import PZCorrect
 
-from ..utils import (
+from ....utils import (
     build_log,
     convert_dict_np_to_float,
     get_pulser_mask,

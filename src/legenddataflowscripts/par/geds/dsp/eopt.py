@@ -20,7 +20,7 @@ from pygama.pargen.dsp_optimize import (
     run_one_dsp,
 )
 
-from ..utils import build_log
+from ....utils import build_log
 
 warnings.filterwarnings(action="ignore", category=RuntimeWarning)
 warnings.filterwarnings(action="ignore", category=np.exceptions.RankWarning)

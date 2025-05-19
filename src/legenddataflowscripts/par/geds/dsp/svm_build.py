@@ -9,7 +9,7 @@ from dbetto.catalog import Props
 from lgdo import lh5
 from sklearn.svm import SVC
 
-from ..utils import build_log
+from ....utils import build_log
 
 
 def par_geds_dsp_svm_build() -> None:

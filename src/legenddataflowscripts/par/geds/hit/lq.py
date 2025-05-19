@@ -14,7 +14,7 @@ from pygama.pargen.lq_cal import *  # noqa: F403
 from pygama.pargen.lq_cal import LQCal
 from pygama.pargen.utils import load_data
 
-from ..utils import (
+from ....utils import (
     build_log,
     convert_dict_np_to_float,
     get_pulser_mask,

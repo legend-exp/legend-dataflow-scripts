@@ -11,7 +11,7 @@ from dbetto.catalog import Props
 from lgdo import Array, Table, lh5
 from pygama.pargen.dplms_ge_dict import dplms_ge_dict
 
-from ..utils import build_log, convert_dict_np_to_float
+from ....utils import build_log, convert_dict_np_to_float
 
 
 def par_geds_dsp_dplms() -> None:

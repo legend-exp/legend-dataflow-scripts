@@ -206,11 +206,11 @@ def install(args) -> None:
     The software packages should be specified in the `config_file` with the
     format:
 
-    ```yaml
-    pkg_versions:
-      - python_package_spec
-      - ...
-    ```
+    .. code-block:: yaml
+
+        pkg_versions:
+          - python_package_spec
+          - ...
 
     .. code-block:: console
 
