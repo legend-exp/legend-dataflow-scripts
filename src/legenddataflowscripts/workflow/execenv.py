@@ -224,7 +224,8 @@ def install(args) -> None:
     utils.subst_vars(
         config_dict, var_values={"_": config_loc}, use_env=True, ignore_missing=False
     )
-    config_dict["execenv"] = config_dict["execenv"][args.system]
+
+    config_dict["execenv"] = config_dict.execenv[args.system]
 
     # path to virtualenv location
     path_install = config_dict.paths.install
