@@ -18,6 +18,8 @@ from . import utils
 
 log = logging.getLogger(__name__)
 
+OCI_ENGINES = ["docker", "podman", "podman-hpc", "shifter"]
+
 
 def _execenv2str(cmd_expr: Iterable, cmd_env: Mapping) -> str:
     return " ".join([f"{k}={v}" for k, v in cmd_env.items()]) + " " + " ".join(cmd_expr)
@@ -27,12 +29,7 @@ def apptainer_env_vars(cmdenv: Mapping) -> list[str]:
     return [f"--env={var}={val}" for var, val in cmdenv.items()]
 
 
-def docker_env_vars(cmdenv: Mapping) -> list[str]:
-    # same syntax
-    return apptainer_env_vars(cmdenv)
-
-
-def shifter_env_vars(cmdenv: Mapping) -> list[str]:
+def oci_engine_env_vars(cmdenv: Mapping) -> list[str]:
     # same syntax
     return apptainer_env_vars(cmdenv)
 
@@ -69,20 +66,20 @@ def execenv_prefix(
                 if has_xdg:
                     cmdline += [f"--bind={xdg_runtime_dir}"]
 
-            elif "docker" in config.execenv.cmd:
-                cmdline += docker_env_vars(config.execenv.env)
+            elif any(engine in config.execenv.cmd for engine in OCI_ENGINES):
+                cmdline += oci_engine_env_vars(config.execenv.env)
 
-            elif "shifter" in config.execenv.cmd:
-                cmdline += shifter_env_vars(config.execenv.env)
-
+            # no XDG mount with shifter
             if (
-                any(exe in config.execenv.cmd for exe in ("docker", "shifter"))
+                any(exe in config.execenv.cmd for exe in OCI_ENGINES)
                 and has_xdg
+                and "shifter" not in config.execenv.cmd
             ):
                 cmdline += [f"--volume={xdg_runtime_dir}:{xdg_runtime_dir}"]
 
         # now we can add the arguments
-        cmdline += shlex.split(config.execenv.arg)
+        _arg = config.execenv.arg
+        cmdline += shlex.split(_arg if isinstance(_arg, str) else " ".join(_arg))
 
     if as_string:
         return _execenv2str(cmdline, cmdenv) + " "
@@ -192,7 +189,7 @@ def dataflow() -> None:
             )
         )
 
-        logger = logging.getLogger("legenddataflow")
+        logger = logging.getLogger("legenddataflowscripts")
         logger.setLevel(logging.DEBUG)
         logger.addHandler(handler)
 

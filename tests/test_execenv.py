@@ -68,7 +68,6 @@ def test_execenv_prefix(config):
         "shifter",
         "--env=VAR1=val1",
         "--env=VAR2=val2",
-        "--volume=whatever:whatever",
         "--image=legendexp/legend-base:latest",
     ]
     assert cmd_env == config.execenv.env
@@ -77,7 +76,6 @@ def test_execenv_prefix(config):
     assert cmd_str == (
         "VAR1=val1 VAR2=val2 "
         "shifter --env=VAR1=val1 --env=VAR2=val2 "
-        "--volume=whatever:whatever "
         "--image=legendexp/legend-base:latest "
     )
 
@@ -99,7 +97,6 @@ def test_execenv_pyexe(config):
     assert cmd_str == (
         "VAR1=val1 VAR2=val2 "
         "shifter --env=VAR1=val1 --env=VAR2=val2 "
-        "--volume=whatever:whatever "
         "--image=legendexp/legend-base:latest "
         ".snakemake/software/bin/dio-boe "
     )
