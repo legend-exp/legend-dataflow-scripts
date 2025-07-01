@@ -129,6 +129,7 @@ def build_qc(
     else:
         hit_dict_fft = {}
         plot_dict_fft = {}
+        fft_data = None
 
     if overwrite is not None:
         for name in kwarg_dict_fft["cut_parameters"]:
@@ -234,7 +235,7 @@ def build_qc(
         exp = info["expression"]
         for key in info.get("parameters", None):
             exp = re.sub(f"(?<![a-zA-Z0-9]){key}(?![a-zA-Z0-9])", f"@{key}", exp)
-        if outname not in fft_data:
+        if fft_data is not None and outname not in fft_data:
             fft_data[outname] = fft_data.eval(
                 exp, local_dict=info.get("parameters", None)
             )
@@ -251,23 +252,33 @@ def build_qc(
                 ((sf_cal) * (1 - sf_cal))
                 / len(data.query("~is_pulser & ~is_recovering"))
             )
-            sf_fft = len(fft_data.query(f"{entry} & ~is_recovering")) / len(
-                fft_data.query("~is_recovering")
-            )
-            sf_fft_err = 100 * np.sqrt(
-                ((sf_fft) * (1 - sf_fft)) / len(fft_data.query("~is_recovering"))
-            )
             sf_cal *= 100
-            sf_fft *= 100
-
-            msg = f"{entry} cut applied: {sf_cal:.2f}% of events passed the cut for cal data, {sf_fft:.2f}% for fft data"
+            msg = f"{entry} cut applied: {sf_cal:.2f}% of events passed the cut for cal data"
             log.info(msg)
+
             qc_results[entry] = {
                 "sf_cal": sf_cal,
                 "sf_cal_err": sf_cal_err,
-                "sf_fft": sf_fft,
-                "sf_fft_err": sf_fft_err,
             }
+
+            if fft_data is not None:
+                sf_fft = len(fft_data.query(f"{entry} & ~is_recovering")) / len(
+                    fft_data.query("~is_recovering")
+                )
+                sf_fft_err = 100 * np.sqrt(
+                    ((sf_fft) * (1 - sf_fft)) / len(fft_data.query("~is_recovering"))
+                )
+                sf_fft *= 100
+                msg = f"{entry} cut applied: {sf_fft:.2f}% of events passed the cut for fft data"
+
+                log.info(msg)
+
+                qc_results[entry].update(
+                    {
+                        "sf_fft": sf_fft,
+                        "sf_fft_err": sf_fft_err,
+                    }
+                )
 
     out_dict = convert_dict_np_to_float(
         {"operations": hit_dict, "results": {"qc": qc_results}}
