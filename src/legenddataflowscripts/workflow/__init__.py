@@ -8,6 +8,7 @@ from .utils import (
     subst_vars_impl,
     subst_vars_in_snakemake_config,
 )
+from .pre_compile_catalog import pre_compile_catalog
 
 __all__ = [
     "as_ro",
@@ -17,4 +18,5 @@ __all__ = [
     "subst_vars",
     "subst_vars_impl",
     "subst_vars_in_snakemake_config",
+    "pre_compile_catalog",
 ]
