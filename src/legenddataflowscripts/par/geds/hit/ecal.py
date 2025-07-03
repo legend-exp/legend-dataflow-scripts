@@ -680,18 +680,32 @@ def par_geds_hit_ecal() -> None:
         hit_dict.update(
             {cal_energy_param: full_object_dict[cal_energy_param].gen_pars_dict()}
         )
-        if "ctc" in cal_energy_param:
-            no_ctc_dict = full_object_dict[cal_energy_param].gen_pars_dict()
-            no_ctc_dict["expression"] = no_ctc_dict["expression"].replace("_ctc", "")
-            hit_dict.update({cal_energy_param.replace("ctc", "noctc"): no_ctc_dict})
-            hit_dict.update(
-                {
-                    cal_energy_param.replace("_ctc", ""): {
-                        "expression": f"where({cal_energy_param.replace('ctc', 'noctc')}>{kwarg_dict.get('dt_theshold_kev', 100)}, {cal_energy_param}, {cal_energy_param.replace('ctc', 'noctc')})",
-                        "parameters": {},
-                    }
-                }
-            )
+        if "copy_calibration" in kwarg_dict:
+            for copy_cal_param, _copy_to_cal_param in kwarg_dict[
+                "copy_calibration"
+            ].items():
+                if copy_cal_param not in full_object_dict:
+                    msg = f"copy_calibration parameter {copy_cal_param} not found in full_object_dict"
+                    raise ValueError(msg)
+                if isinstance(_copy_to_cal_param, str):
+                    copy_to_cal_param = [_copy_to_cal_param]
+                else:
+                    copy_to_cal_param = _copy_to_cal_param
+                for cal_par in copy_to_cal_param:
+                    if cal_par in full_object_dict:
+                        msg = f"copy_calibration parameter {cal_par} already exists in full_object_dict"
+                        raise ValueError(msg)
+                    copy_dict = {cal_par: full_object_dict[cal_par].gen_pars_dict()}
+                    copy_dict["expression"] = copy_dict[cal_par]["expression"].replace(
+                        copy_cal_param, cal_par
+                    )
+                    hit_dict.update({cal_par: copy_dict[cal_par]})
+        if "extra_blocks" in kwarg_dict:
+            if isinstance(kwarg_dict["extra_blocks"], dict):
+                kwarg_dict["extra_blocks"] = [kwarg_dict["extra_blocks"]]
+            for extra_block in kwarg_dict["extra_blocks"]:
+                hit_dict.update(extra_block)
+
         if args.plot_path:
             param_plot_dict = {}
             if ~np.isnan(full_object_dict[cal_energy_param].pars).all():
