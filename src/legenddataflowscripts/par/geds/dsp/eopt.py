@@ -23,7 +23,10 @@ from pygama.pargen.dsp_optimize import (
 from ....utils import build_log
 
 warnings.filterwarnings(action="ignore", category=RuntimeWarning)
-warnings.filterwarnings(action="ignore", category=np.exceptions.RankWarning)
+try:
+    warnings.filterwarnings(action="ignore", category=np.exceptions.RankWarning)
+except AttributeError:  # np < 2
+    warnings.filterwarnings(action="ignore", category=np.RankWarning)
 
 
 def par_geds_dsp_eopt() -> None:
