@@ -295,7 +295,7 @@ def par_geds_hit_lq() -> None:
 
         data["run_timestamp"] = args.timestamp
 
-        out_dicts, eres_dicts, plot_dicts, lq_dict = run_lq_calibration(
+        out_dicts, results_dicts, plot_dicts, lq_dict = run_lq_calibration(
             data,
             cal_dicts={args.timestamp: cal_dict},
             results_dicts={args.timestamp: eres_dict},
@@ -305,12 +305,13 @@ def par_geds_hit_lq() -> None:
             debug_mode=args.debug,
         )
         cal_dict = out_dicts[args.timestamp]
-        eres_dict = eres_dicts[args.timestamp]
+        results_dict = results_dicts[args.timestamp]
         plot_dict = plot_dicts[args.timestamp]
         lq = lq_dict[args.timestamp]
 
     else:
         lq = None
+        results_dict = {}
 
     if args.plot_file:
         Path(args.plot_file).parent.mkdir(parents=True, exist_ok=True)
@@ -320,7 +321,7 @@ def par_geds_hit_lq() -> None:
     final_hit_dict = convert_dict_np_to_float(
         {
             "pars": {"operations": cal_dict},
-            "results": dict(**ecal_dict["results"], lq=eres_dict),
+            "results": dict(**ecal_dict["results"], lq=results_dict),
         }
     )
     Path(args.hit_pars).parent.mkdir(parents=True, exist_ok=True)

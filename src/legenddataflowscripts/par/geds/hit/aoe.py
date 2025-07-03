@@ -297,6 +297,7 @@ def par_geds_hit_aoe() -> None:
     else:
         aoe = None
         plot_dict = out_plot_dict
+        results_dict = {}
 
     if args.plot_file:
         common_dict = plot_dict.pop("common") if "common" in list(plot_dict) else None
