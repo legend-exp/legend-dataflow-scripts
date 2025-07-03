@@ -24,7 +24,7 @@ def convert_dict_np_to_float(dic: dict) -> dict:
             convert_dict_np_to_float(value)
         elif isinstance(value, np.float32 | np.float64):
             dic[key] = float(value)
-        elif isinstance(dic[key], Sequence):
+        elif isinstance(dic[key], Sequence) and not isinstance(dic[key], str):
             dic[key] = [
                 float(x) if isinstance(x, np.float32 | np.float64) else x for x in value
             ]
