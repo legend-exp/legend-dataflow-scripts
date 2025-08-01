@@ -43,6 +43,7 @@ def alias_table(file: str | Path, mapping: str):
     if isinstance(mapping, list):
         for m in mapping:
             alias_table(file, m)
+        return
     with h5py.File(file, "a") as f:
         for raw_id, alias in mapping.items():
             if raw_id in f:
