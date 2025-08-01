@@ -316,10 +316,16 @@ def cmdexec(args) -> None:
     )
     config_dict["execenv"] = config_dict["execenv"][args.system]
 
+    exe_path = Path(config_dict.paths.install).resolve() / "bin"
+
     cmd_prefix, cmd_env = execenv_prefix(config_dict, as_string=False)
     cmd_expr = [*cmd_prefix, *args.command]
 
     msg = "running: " + _execenv2str(cmd_expr, cmd_env)
     log.debug(msg)
 
-    subprocess.run(cmd_expr, env=os.environ | cmd_env, check=True)
+    env_dict = os.environ | cmd_env
+    env_dict["PATH"] = (
+        f"{exe_path}:{env_dict['PATH']}"  # prepend the virtualenv bin dir
+    )
+    subprocess.run(cmd_expr, env=env_dict, check=True)
