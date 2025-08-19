@@ -220,7 +220,7 @@ def par_geds_hit_aoe() -> None:
 
     ecal_dict = Props.read_from(args.ecal_file)
     cal_dict = ecal_dict["pars"]
-    eres_dict = ecal_dict["results"]["ecal"]
+    eres_dict = ecal_dict["results"]
 
     with Path(args.eres_file).open("rb") as o:
         object_dict = pkl.load(o)
