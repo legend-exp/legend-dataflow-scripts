@@ -247,7 +247,7 @@ def par_geds_hit_lq() -> None:
 
     ecal_dict = Props.read_from(args.ecal_file)
     cal_dict = ecal_dict["pars"]["operations"]
-    eres_dict = ecal_dict["results"]["ecal"]
+    eres_dict = ecal_dict["results"]
 
     if args.inplots:
         with Path(args.inplots).open("rb") as r:
@@ -334,4 +334,5 @@ def par_geds_hit_lq() -> None:
     Path(args.lq_results).parent.mkdir(parents=True, exist_ok=True)
     with Path(args.lq_results).open("wb") as w:
         pkl.dump(final_object_dict, w, protocol=pkl.HIGHEST_PROTOCOL)
+
 
