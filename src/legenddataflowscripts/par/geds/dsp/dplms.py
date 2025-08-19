@@ -95,7 +95,7 @@ def par_geds_dsp_dplms() -> None:
                 dsp_config,
                 db_dict,
                 dplms_dict,
-                fom_func = eval(dplms_dict.get("fom_func", "pmd.gauss_on_step"))
+                fom_func = eval(dplms_dict.get("fom_func", "pmd.gauss_on_step")),
                 display=1,
             )
             if args.inplots:
