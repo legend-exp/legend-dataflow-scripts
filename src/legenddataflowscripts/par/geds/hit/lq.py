@@ -321,7 +321,7 @@ def par_geds_hit_lq() -> None:
     final_hit_dict = convert_dict_np_to_float(
         {
             "pars": {"operations": cal_dict},
-            "results": dict(**ecal_dict["results"], lq=results_dict),
+            "results": results_dict,
         }
     )
     Path(args.hit_pars).parent.mkdir(parents=True, exist_ok=True)
@@ -334,3 +334,4 @@ def par_geds_hit_lq() -> None:
     Path(args.lq_results).parent.mkdir(parents=True, exist_ok=True)
     with Path(args.lq_results).open("wb") as w:
         pkl.dump(final_object_dict, w, protocol=pkl.HIGHEST_PROTOCOL)
+
