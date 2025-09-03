@@ -6,11 +6,11 @@ import time
 from pathlib import Path
 
 import numpy as np
+import pygama.math.distributions as pmd  # noqa: F401
 from dbetto import TextDB
 from dbetto.catalog import Props
 from lgdo import Array, Table, lh5
 from pygama.pargen.dplms_ge_dict import dplms_ge_dict
-import pygama.math.distributions as pmd  # noqa: pycln, F401
 
 from ....utils import build_log, convert_dict_np_to_float
 
@@ -95,7 +95,7 @@ def par_geds_dsp_dplms() -> None:
                 dsp_config,
                 db_dict,
                 dplms_dict,
-                fom_func = eval(dplms_dict.get("fom_func", "pmd.gauss_on_step")),
+                fom_func=eval(dplms_dict.get("fom_func", "pmd.gauss_on_step")),
                 display=1,
             )
             if args.inplots:
@@ -110,7 +110,7 @@ def par_geds_dsp_dplms() -> None:
                 dsp_config,
                 db_dict,
                 dplms_dict,
-                fom_func = eval(dplms_dict.get("fom_func", "pmd.gauss_on_step"))
+                fom_func=eval(dplms_dict.get("fom_func", "pmd.gauss_on_step")),
             )
 
         coeffs = out_dict["dplms"].pop("coefficients")

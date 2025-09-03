@@ -315,7 +315,7 @@ def par_geds_hit_aoe() -> None:
     Path(args.hit_pars).parent.mkdir(parents=True, exist_ok=True)
     final_hit_dict = {
         "pars": {"operations": cal_dict},
-        "results":results_dict,
+        "results": results_dict,
     }
 
     final_hit_dict = convert_dict_np_to_float(final_hit_dict)

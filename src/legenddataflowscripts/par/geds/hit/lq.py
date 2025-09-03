@@ -334,5 +334,3 @@ def par_geds_hit_lq() -> None:
     Path(args.lq_results).parent.mkdir(parents=True, exist_ok=True)
     with Path(args.lq_results).open("wb") as w:
         pkl.dump(final_object_dict, w, protocol=pkl.HIGHEST_PROTOCOL)
-
-
