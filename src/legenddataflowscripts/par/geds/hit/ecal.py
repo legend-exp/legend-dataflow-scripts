@@ -681,9 +681,12 @@ def par_geds_hit_ecal() -> None:
             {cal_energy_param: full_object_dict[cal_energy_param].gen_pars_dict()}
         )
         if "copy_calibration" in kwarg_dict:
-            for copy_cal_param, _copy_to_cal_param in kwarg_dict[
+            for copy_cal_param, copy_dict in kwarg_dict[
                 "copy_calibration"
             ].items():
+                copy_cal_param = copy_dict["copy_param"]
+                new_input_param = copy_dict["new_input_param"]
+                old_input_param = copy_dict["old_input_param"]
                 if copy_cal_param not in full_object_dict:
                     msg = f"copy_calibration parameter {copy_cal_param} not found in full_object_dict"
                     raise ValueError(msg)
@@ -697,7 +700,7 @@ def par_geds_hit_ecal() -> None:
                         raise ValueError(msg)
                     copy_dict = {cal_par: full_object_dict[cal_par].gen_pars_dict()}
                     copy_dict["expression"] = copy_dict[cal_par]["expression"].replace(
-                        copy_cal_param, cal_par
+                        old_input_param, new_input_param
                     )
                     hit_dict.update({cal_par: copy_dict[cal_par]})
         if "extra_blocks" in kwarg_dict:
