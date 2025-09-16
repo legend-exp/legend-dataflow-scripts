@@ -680,30 +680,7 @@ def par_geds_hit_ecal() -> None:
         hit_dict.update(
             {cal_energy_param: full_object_dict[cal_energy_param].gen_pars_dict()}
         )
-        if "copy_calibration" in kwarg_dict:
-            for cal_par, copy_dict in kwarg_dict[
-                "copy_calibration"
-            ].items():
-                copy_cal_param = copy_dict["copy_param"]
-                new_input_param = copy_dict["new_input_param"]
-                old_input_param = copy_dict["old_input_param"]
-                if copy_cal_param not in full_object_dict:
-                    msg = f"copy_calibration parameter {copy_cal_param} not found in full_object_dict"
-                    raise ValueError(msg)
-                if cal_par in full_object_dict:
-                    msg = f"copy_calibration parameter {cal_par} already exists in full_object_dict"
-                    raise ValueError(msg)
-                copy_dict = {cal_par: hit_dict[copy_cal_param]}
-                copy_dict["expression"] = copy_dict[cal_par]["expression"].replace(
-                    old_input_param, new_input_param
-                )
-                hit_dict.update({cal_par: copy_dict[cal_par]})
-        if "extra_blocks" in kwarg_dict:
-            if isinstance(kwarg_dict["extra_blocks"], dict):
-                kwarg_dict["extra_blocks"] = [kwarg_dict["extra_blocks"]]
-            for extra_block in kwarg_dict["extra_blocks"]:
-                hit_dict.update(extra_block)
-
+        
         if args.plot_path:
             param_plot_dict = {}
             if ~np.isnan(full_object_dict[cal_energy_param].pars).all():
@@ -761,6 +738,32 @@ def par_geds_hit_ecal() -> None:
                 peak_dict["parameters"] = peak_dict["parameters"].to_dict()
                 peak_dict["uncertainties"] = peak_dict["uncertainties"].to_dict()
 
+    if "copy_calibration" in kwarg_dict:
+        for cal_par, copy_dict in kwarg_dict[
+            "copy_calibration"
+        ].items():
+            copy_cal_param = copy_dict["copy_param"]
+            new_input_param = copy_dict["new_input_param"]
+            old_input_param = copy_dict["old_input_param"]
+            if copy_cal_param not in full_object_dict:
+                msg = f"copy_calibration parameter {copy_cal_param} not found in full_object_dict"
+                raise ValueError(msg)
+            if cal_par in full_object_dict:
+                msg = f"copy_calibration parameter {cal_par} already exists in full_object_dict"
+                raise ValueError(msg)
+            copy_dict = {cal_par: hit_dict[copy_cal_param]}
+            copy_dict["expression"] = copy_dict[cal_par]["expression"].replace(
+                old_input_param, new_input_param
+            )
+            hit_dict.update({cal_par: copy_dict[cal_par]})
+    if "extra_blocks" in kwarg_dict:
+        if isinstance(kwarg_dict["extra_blocks"], dict):
+            kwarg_dict["extra_blocks"] = [kwarg_dict["extra_blocks"]]
+        for extra_block in kwarg_dict["extra_blocks"]:
+            hit_dict.update(extra_block)
+
+
+    
     if "monitoring_parameters" in kwarg_dict:
         monitor_dict = monitor_parameters(
             files, args.table_name, kwarg_dict["monitoring_parameters"]
