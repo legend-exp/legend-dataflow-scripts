@@ -681,10 +681,10 @@ def par_geds_hit_ecal() -> None:
             {cal_energy_param: full_object_dict[cal_energy_param].gen_pars_dict()}
         )
         if "copy_calibration" in kwarg_dict:
-            for copy_cal_param, copy_dict in kwarg_dict[
+            for cal_par, copy_dict in kwarg_dict[
                 "copy_calibration"
             ].items():
-                cal_par = copy_dict["output_param"]
+                copy_cal_param = copy_dict["copy_param"]
                 new_input_param = copy_dict["new_input_param"]
                 old_input_param = copy_dict["old_input_param"]
                 if copy_cal_param not in full_object_dict:
