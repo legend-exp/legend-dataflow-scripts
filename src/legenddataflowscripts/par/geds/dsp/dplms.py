@@ -7,7 +7,6 @@ from pathlib import Path
 
 import numpy as np
 import pygama.math.distributions as pmd  # noqa: F401
-from dbetto import TextDB
 from dbetto.catalog import Props
 from lgdo import Array, Table, lh5
 from pygama.pargen.dplms_ge_dict import dplms_ge_dict
@@ -23,11 +22,21 @@ def par_geds_dsp_dplms() -> None:
     argparser.add_argument("--database", help="database", type=str, required=True)
 
     argparser.add_argument("--log", help="log_file", type=str)
-    argparser.add_argument("--configs", help="configs", type=str, required=True)
+    argparser.add_argument(
+        "--log-config", help="Log config file", type=str, required=False, default={}
+    )
 
-    argparser.add_argument("--datatype", help="Datatype", type=str, required=True)
-    argparser.add_argument("--timestamp", help="Timestamp", type=str, required=True)
-    argparser.add_argument("--channel", help="Channel", type=str, required=True)
+    argparser.add_argument(
+        "--processing-chain",
+        help="Processing chain config",
+        type=str,
+        nargs="*",
+        required=True,
+    )
+    argparser.add_argument(
+        "--config-file", help="Config file", type=str, nargs="*", required=True
+    )
+
     argparser.add_argument(
         "--raw-table-name", help="raw table name", type=str, required=True
     )
@@ -38,18 +47,13 @@ def par_geds_dsp_dplms() -> None:
 
     args = argparser.parse_args()
 
-    configs = TextDB(args.configs, lazy=True).on(args.timestamp, system=args.datatype)
-    config_dict = configs["snakemake_rules"]["pars_dsp_dplms"]
+    dsp_config = Props.read_from(args.processing_chain)
+    log = build_log(args.log_config, args.log)
 
-    log = build_log(config_dict, args.log)
+    t0 = time.time()
 
-    configs = TextDB(args.configs).on(args.timestamp, system=args.datatype)
-    dsp_config = config_dict["inputs"]["proc_chain"][args.channel]
-
-    dplms_json = config_dict["inputs"]["dplms_pars"][args.channel]
-    dplms_dict = Props.read_from(dplms_json)
-
-    db_dict = Props.read_from(args.database)
+    dplms_dict = Props.read_from(args.config_file)
+    db_dict = Props.read_from(args.decay_const)
 
     if dplms_dict["run_dplms"] is True:
         with Path(args.fft_raw_filelist).open() as f:

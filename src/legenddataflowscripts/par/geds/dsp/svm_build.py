@@ -4,7 +4,6 @@ import argparse
 import pickle as pkl
 from pathlib import Path
 
-from dbetto import TextDB
 from dbetto.catalog import Props
 from lgdo import lh5
 from sklearn.svm import SVC
@@ -15,10 +14,10 @@ from ....utils import build_log
 def par_geds_dsp_svm_build() -> None:
     argparser = argparse.ArgumentParser()
     argparser.add_argument("--log", help="log file", type=str)
-    argparser.add_argument("--configs", help="config file", type=str)
 
-    argparser.add_argument("--datatype", help="Datatype", type=str, required=True)
-    argparser.add_argument("--timestamp", help="Timestamp", type=str, required=True)
+    argparser.add_argument(
+        "--log-config", help="Log config file", type=str, required=False, default={}
+    )
 
     argparser.add_argument(
         "--output-file", help="output SVM file", type=str, required=True
@@ -31,10 +30,7 @@ def par_geds_dsp_svm_build() -> None:
     )
     args = argparser.parse_args()
 
-    configs = TextDB(args.configs, lazy=True).on(args.timestamp, system=args.datatype)
-    config_dict = configs["snakemake_rules"]["pars_dsp_build_svm"]
-
-    log = build_log(config_dict, args.log)
+    log = build_log(args.log_config, args.log)
 
     if args.train_data is not None and len(args.train_data) > 0:
         # Load files

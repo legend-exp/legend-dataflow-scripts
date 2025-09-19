@@ -6,7 +6,6 @@ import pickle as pkl
 from pathlib import Path
 
 import numpy as np
-from dbetto import TextDB
 from dbetto.catalog import Props
 from lgdo import lh5
 from pygama.pargen.data_cleaning import get_cut_indexes
@@ -28,9 +27,20 @@ def par_geds_dsp_pz() -> None:
         "-p", "--no-pulse", help="no pulser present", action="store_true"
     )
 
-    argparser.add_argument("--datatype", help="Datatype", type=str, required=True)
-    argparser.add_argument("--timestamp", help="Timestamp", type=str, required=True)
-    argparser.add_argument("--channel", help="Channel", type=str, required=True)
+    argparser.add_argument(
+        "--processing-chain",
+        help="Processing chain config",
+        type=str,
+        nargs="*",
+        required=True,
+    )
+    argparser.add_argument(
+        "--config-file", help="Config file", type=str, nargs="*", required=True
+    )
+    argparser.add_argument(
+        "--log-config", help="Log config file", type=str, required=False, default={}
+    )
+
     argparser.add_argument(
         "--raw-table-name", help="raw table name", type=str, required=True
     )
@@ -46,18 +56,11 @@ def par_geds_dsp_pz() -> None:
     argparser.add_argument("--pz-files", help="input files", nargs="*", type=str)
     args = argparser.parse_args()
 
-    configs = TextDB(args.configs, lazy=True).on(args.timestamp, system=args.datatype)
-    config_dict = configs["snakemake_rules"]["pars_dsp_tau"]
-
-    log = build_log(config_dict, args.log)
-
-    channel_dict = config_dict["inputs"]["processing_chain"][args.channel]
-    kwarg_dict = config_dict["inputs"]["tau_config"][args.channel]
-
-    kwarg_dict = Props.read_from(kwarg_dict)
+    log = build_log(args.log_config, args.log)
+    kwarg_dict = Props.read_from(args.config_file)
 
     if kwarg_dict["run_tau"] is True:
-        dsp_config = Props.read_from(channel_dict)
+        dsp_config = Props.read_from(args.processing_chain)
         kwarg_dict.pop("run_tau")
         if args.pz_files is not None and len(args.pz_files) > 0:
             if (

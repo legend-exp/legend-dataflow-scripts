@@ -39,6 +39,8 @@ def build_log(
     log_file
         The path to the log file.
     """
+    if isinstance(config_dict, str):
+        config_dict = {"options": {"logging": config_dict}}
     if "logging" in config_dict["options"]:
         log_config = config_dict["options"]["logging"]
         log_config = Props.read_from(log_config)

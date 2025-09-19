@@ -10,7 +10,6 @@ import warnings
 from pathlib import Path
 
 import numpy as np
-from dbetto import TextDB
 from dbetto.catalog import Props
 from pygama.pargen.AoE_cal import *  # noqa: F403
 from pygama.pargen.AoE_cal import CalAoE
@@ -195,12 +194,15 @@ def par_geds_hit_aoe() -> None:
     argparser.add_argument("--eres-file", help="eres_file", type=str, required=True)
     argparser.add_argument("--inplots", help="in_plot_path", type=str, required=False)
 
-    argparser.add_argument("--configs", help="configs", type=str, required=True)
     argparser.add_argument("--log", help="log_file", type=str)
+    argparser.add_argument(
+        "--log-config", help="Log config file", type=str, required=False, default={}
+    )
 
-    argparser.add_argument("--datatype", help="Datatype", type=str, required=True)
-    argparser.add_argument("--timestamp", help="Timestamp", type=str, required=True)
-    argparser.add_argument("--channel", help="Channel", type=str, required=True)
+    argparser.add_argument(
+        "--config-file", help="Config file", type=str, nargs="*", required=True
+    )
+
     argparser.add_argument("--table-name", help="table name", type=str, required=True)
 
     argparser.add_argument("--plot-file", help="plot_file", type=str, required=False)
@@ -210,13 +212,8 @@ def par_geds_hit_aoe() -> None:
     argparser.add_argument("-d", "--debug", help="debug_mode", action="store_true")
     args = argparser.parse_args()
 
-    configs = TextDB(args.configs, lazy=True).on(args.timestamp, system=args.datatype)
-    config_dict = configs["snakemake_rules"]["pars_hit_aoecal"]
-
-    build_log(config_dict, args.log)
-
-    channel_dict = config_dict["inputs"]["aoecal_config"][args.channel]
-    kwarg_dict = Props.read_from(channel_dict)
+    log = build_log(args.log_config, args.log)
+    kwarg_dict = Props.read_from(args.config_file)
 
     ecal_dict = Props.read_from(args.ecal_file)
     cal_dict = ecal_dict["pars"]

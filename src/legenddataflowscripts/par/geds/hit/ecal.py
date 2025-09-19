@@ -12,9 +12,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pygama.math.distributions as pgf
 import pygama.math.histogram as pgh
-from dbetto import TextDB
 from dbetto.catalog import Props
-from legendmeta import LegendMetadata
 from lgdo import lh5
 from matplotlib.colors import LogNorm
 from pygama.math.distributions import nb_poly
@@ -460,16 +458,20 @@ def par_geds_hit_ecal() -> None:
     argparser.add_argument("--in-hit-dict", help="in_hit_dict", required=False)
     argparser.add_argument("--inplot-dict", help="inplot_dict", required=False)
 
-    argparser.add_argument("--datatype", help="Datatype", type=str, required=True)
-    argparser.add_argument("--timestamp", help="Timestamp", type=str, required=True)
-    argparser.add_argument("--channel", help="Channel", type=str, required=True)
-    argparser.add_argument("--table-name", help="table name", type=str, required=True)
-
-    argparser.add_argument("--tier", help="tier", type=str, default="hit")
-    argparser.add_argument("--configs", help="config", type=str, required=True)
-    argparser.add_argument("--metadata", help="metadata path", type=str, required=True)
-
     argparser.add_argument("--log", help="log_file", type=str)
+    argparser.add_argument(
+        "--log-config", help="Log config file", type=str, required=False, default={}
+    )
+
+    argparser.add_argument(
+        "--config-file", help="Config file", type=str, nargs="*", required=True
+    )
+
+    argparser.add_argument(
+        "--det-status", help="detector status", type=str, default="on", required=False
+    )
+
+    argparser.add_argument("--table-name", help="table name", type=str, required=True)
 
     argparser.add_argument("--plot-path", help="plot_path", type=str, required=False)
     argparser.add_argument("--save-path", help="save_path", type=str)
@@ -478,22 +480,7 @@ def par_geds_hit_ecal() -> None:
     argparser.add_argument("-d", "--debug", help="debug_mode", action="store_true")
     args = argparser.parse_args()
 
-    configs = TextDB(args.configs, lazy=True).on(args.timestamp, system=args.datatype)
-    config_dict = configs["snakemake_rules"]
-    if args.tier == "hit":
-        config_dict = config_dict["pars_hit_ecal"]
-    elif args.tier == "pht":
-        config_dict = config_dict["pars_pht_ecal"]
-    else:
-        msg = "invalid tier"
-        raise ValueError(msg)
-
-    log = build_log(config_dict, args.log)
-
-    chmap = LegendMetadata(args.metadata).channelmap(
-        args.timestamp, system=args.datatype
-    )
-    det_status = chmap[args.channel]["analysis"]["usability"]
+    log = build_log(args.log_config, args.log)
 
     if args.in_hit_dict:
         hit_dict = Props.read_from(args.in_hit_dict)
@@ -510,8 +497,7 @@ def par_geds_hit_ecal() -> None:
 
     hit_dict.update(database_dic[args.channel]["ctc_params"])
 
-    channel_dict = config_dict["inputs"]["ecal_config"][args.channel]
-    kwarg_dict = Props.read_from(channel_dict)
+    kwarg_dict = Props.read_from(args.config_file)
 
     # convert plot functions from strings to functions and split off baseline and common plots
     for field, item in kwarg_dict["plot_options"].items():
@@ -605,7 +591,7 @@ def par_geds_hit_ecal() -> None:
             debug_mode=kwarg_dict.get("debug_mode", False) | args.debug,
         )
         full_object_dict[cal_energy_param].hpge_get_energy_peaks(
-            e_uncal, etol_kev=5 if det_status == "on" else 20
+            e_uncal, etol_kev=5 if args.det_status == "on" else 20
         )
         if 2614.511 not in full_object_dict[cal_energy_param].peaks_kev:
             full_object_dict[cal_energy_param] = HPGeCalibration(
@@ -616,10 +602,10 @@ def par_geds_hit_ecal() -> None:
                 debug_mode=kwarg_dict.get("debug_mode", False),
             )
             full_object_dict[cal_energy_param].hpge_get_energy_peaks(
-                e_uncal, etol_kev=5 if det_status == "on" else 30, n_sigma=2
+                e_uncal, etol_kev=5 if args.det_status == "on" else 30, n_sigma=2
             )
         got_peaks_kev = full_object_dict[cal_energy_param].peaks_kev.copy()
-        if det_status != "on":
+        if args.det_status != "on":
             full_object_dict[cal_energy_param].hpge_cal_energy_peak_tops(
                 e_uncal,
                 peaks_kev=got_peaks_kev,
@@ -633,7 +619,7 @@ def par_geds_hit_ecal() -> None:
             tail_weight=kwarg_dict.get("tail_weight", 0),
             n_events=kwarg_dict.get("n_events", None),
             allowed_p_val=kwarg_dict.get("p_val", 0),
-            update_cal_pars=bool(det_status == "on"),
+            update_cal_pars=bool(args.det_status == "on"),
             bin_width_kev=0.5,
         )
         full_object_dict[cal_energy_param].hpge_fit_energy_peaks(
@@ -728,7 +714,7 @@ def par_geds_hit_ecal() -> None:
             peak_dict["parameters"] = peak_dict["parameters"].to_dict()
             peak_dict["uncertainties"] = peak_dict["uncertainties"].to_dict()
 
-        if det_status != "on":
+        if args.det_status != "on":
             for peak_dict in (
                 full_object_dict[cal_energy_param]
                 .results["hpge_cal_energy_peak_tops"]["peak_parameters"]

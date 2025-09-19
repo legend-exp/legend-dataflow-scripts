@@ -11,7 +11,6 @@ import lgdo
 import numpy as np
 import pygama.math.histogram as pgh
 import pygama.pargen.energy_cal as pgc
-from dbetto import TextDB
 from dbetto.catalog import Props
 from lgdo import lh5
 from pygama.pargen.data_cleaning import generate_cuts, get_keys
@@ -101,11 +100,21 @@ def par_geds_dsp_evtsel() -> None:
     )
 
     argparser.add_argument("--log", help="log_file", type=str)
-    argparser.add_argument("--configs", help="configs", type=str, required=True)
 
-    argparser.add_argument("--datatype", help="Datatype", type=str, required=True)
-    argparser.add_argument("--timestamp", help="Timestamp", type=str, required=True)
-    argparser.add_argument("--channel", help="Channel", type=str, required=True)
+    argparser.add_argument(
+        "--processing-chain",
+        help="Processing chain config",
+        type=str,
+        nargs="*",
+        required=True,
+    )
+    argparser.add_argument(
+        "--config-file", help="Config file", type=str, nargs="*", required=True
+    )
+    argparser.add_argument(
+        "--log-config", help="Log config file", type=str, required=False, default={}
+    )
+
     argparser.add_argument(
         "--raw-table-name", help="raw table name", type=str, required=True
     )
@@ -113,18 +122,14 @@ def par_geds_dsp_evtsel() -> None:
     argparser.add_argument("--peak-file", help="peak_file", type=str, required=True)
     args = argparser.parse_args()
 
-    configs = TextDB(args.configs, lazy=True).on(args.timestamp, system=args.datatype)
-    config_dict = configs["snakemake_rules"]["pars_dsp_peak_selection"]
-
-    log = build_log(config_dict, args.log)
+    log = build_log(args.log_config, args.log)
 
     sto = lh5.LH5Store()
     t0 = time.time()
 
-    dsp_config = config_dict["inputs"]["processing_chain"][args.channel]
-    peak_json = config_dict["inputs"]["peak_config"][args.channel]
+    dsp_config = Props.read_from(args.processing_chain)
 
-    peak_dict = Props.read_from(peak_json)
+    peak_dict = Props.read_from(args.config_file)
     db_dict = Props.read_from(args.decay_const)
 
     Path(args.peak_file).parent.mkdir(parents=True, exist_ok=True)

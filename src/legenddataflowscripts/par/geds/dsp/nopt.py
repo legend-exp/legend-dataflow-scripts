@@ -7,7 +7,6 @@ from pathlib import Path
 
 import numpy as np
 import pygama.pargen.noise_optimization as pno
-from dbetto import TextDB
 from dbetto.catalog import Props
 from lgdo import lh5
 from pygama.pargen.data_cleaning import generate_cuts, get_cut_indexes
@@ -22,12 +21,22 @@ def par_geds_dsp_nopt() -> None:
     argparser.add_argument("--database", help="database", type=str, required=True)
     argparser.add_argument("--inplots", help="inplots", type=str)
 
-    argparser.add_argument("--configs", help="configs", type=str, required=True)
     argparser.add_argument("--log", help="log_file", type=str)
 
-    argparser.add_argument("--datatype", help="Datatype", type=str, required=True)
-    argparser.add_argument("--timestamp", help="Timestamp", type=str, required=True)
-    argparser.add_argument("--channel", help="Channel", type=str, required=True)
+    argparser.add_argument(
+        "--processing-chain",
+        help="Processing chain config",
+        type=str,
+        nargs="*",
+        required=True,
+    )
+    argparser.add_argument(
+        "--config-file", help="Config file", type=str, nargs="*", required=True
+    )
+    argparser.add_argument(
+        "--log-config", help="Log config file", type=str, required=False, default={}
+    )
+
     argparser.add_argument(
         "--raw-table-name", help="raw table name", type=str, required=True
     )
@@ -37,18 +46,13 @@ def par_geds_dsp_nopt() -> None:
 
     args = argparser.parse_args()
 
-    configs = TextDB(args.configs, lazy=True).on(args.timestamp, system=args.datatype)
-    config_dict = configs["snakemake_rules"]["pars_dsp_nopt"]
-
-    log = build_log(config_dict, args.log)
+    dsp_config = Props.read_from(args.processing_chain)
+    log = build_log(args.log_config, args.log)
 
     t0 = time.time()
 
-    dsp_config = config_dict["inputs"]["processing_chain"][args.channel]
-    opt_json = config_dict["inputs"]["optimiser_config"][args.channel]
-
-    opt_dict = Props.read_from(opt_json)
-    db_dict = Props.read_from(args.database)
+    opt_dict = Props.read_from(args.config_file)
+    db_dict = Props.read_from(args.decay_const)
 
     if opt_dict.pop("run_nopt") is True:
         with Path(args.raw_filelist).open() as f:
@@ -80,9 +84,6 @@ def par_geds_dsp_nopt() -> None:
         )
         msg = f"... {len(tb_data)} baselines after cuts"
         log.info(msg)
-
-        if isinstance(dsp_config, str | list):
-            dsp_config = Props.read_from(dsp_config)
 
         if args.plot_path:
             out_dict, plot_dict = pno.noise_optimization(

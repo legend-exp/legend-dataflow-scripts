@@ -10,7 +10,6 @@ import warnings
 from pathlib import Path
 
 import numpy as np
-from dbetto import TextDB
 from dbetto.catalog import Props
 from lgdo.lh5 import ls
 from pygama.pargen.data_cleaning import (
@@ -306,27 +305,25 @@ def par_geds_hit_qc() -> None:
         nargs="*",
     )
 
-    argparser.add_argument("--configs", help="config", type=str, required=True)
     argparser.add_argument("--log", help="log_file", type=str)
+    argparser.add_argument(
+        "--log-config", help="Log config file", type=str, required=False, default={}
+    )
 
-    argparser.add_argument("--datatype", help="Datatype", type=str, required=True)
-    argparser.add_argument("--timestamp", help="Timestamp", type=str, required=True)
-    argparser.add_argument("--channel", help="Channel", type=str, required=True)
+    argparser.add_argument(
+        "--config-file", help="Config file", type=str, nargs="*", required=True
+    )
+
     argparser.add_argument("--table-name", help="table name", type=str, required=True)
-    argparser.add_argument("--tier", help="tier", type=str, default="hit")
 
     argparser.add_argument("--plot-path", help="plot_path", type=str, required=False)
     argparser.add_argument("--save-path", help="save_path", type=str)
     args = argparser.parse_args()
 
-    configs = TextDB(args.configs, lazy=True).on(args.timestamp, system=args.datatype)
-    config_dict = configs["snakemake_rules"]["pars_hit_qc"]
-
-    build_log(config_dict, args.log)
+    build_log(args.log_config, args.log)
 
     # get metadata dictionary
-    channel_dict = config_dict["inputs"]["qc_config"][args.channel]
-    kwarg_dict = Props.read_from(channel_dict)
+    kwarg_dict = Props.read_from(args.config_file)
 
     if args.overwrite_files:
         overwrite = Props.read_from(args.overwrite_files)
