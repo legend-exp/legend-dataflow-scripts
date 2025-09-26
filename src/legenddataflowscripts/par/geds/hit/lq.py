@@ -292,7 +292,7 @@ def par_geds_hit_lq() -> None:
 
         data["run_timestamp"] = args.timestamp
 
-        out_dicts, results_dicts, plot_dicts, lq_dict = run_lq_calibration(
+        out_dicts, results_dicts, lq_dict, plot_dicts  = run_lq_calibration(
             data,
             cal_dicts={args.timestamp: cal_dict},
             results_dicts={args.timestamp: eres_dict},
@@ -331,3 +331,4 @@ def par_geds_hit_lq() -> None:
     Path(args.lq_results).parent.mkdir(parents=True, exist_ok=True)
     with Path(args.lq_results).open("wb") as w:
         pkl.dump(final_object_dict, w, protocol=pkl.HIGHEST_PROTOCOL)
+
