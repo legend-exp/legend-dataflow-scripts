@@ -159,7 +159,7 @@ def par_geds_dsp_pz() -> None:
             tau.get_single_decay_constant(
                 tb_data, kwarg_dict.get("slope_param", "tail_slope")
             )
-            msg = f"Found tau: {tau.output_dict['pz']['tau']}+- {tau.output_dict['pz']['tau_err']}"
+            msg = f"Found tau: {tau.output_dict['pz']['tau1']}+- {tau.output_dict['pz']['tau1_err']}"
             log.debug(msg)
         elif kwarg_dict["mode"] == "double":
             tau.get_dpz_decay_constants(
