@@ -304,6 +304,7 @@ def par_geds_hit_qc() -> None:
         required=False,
         nargs="*",
     )
+    argparser.add_argument("--channel", help="channel", type=str)
 
     argparser.add_argument("--log", help="log_file", type=str)
     argparser.add_argument(

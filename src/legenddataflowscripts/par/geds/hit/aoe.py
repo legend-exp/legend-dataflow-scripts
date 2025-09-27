@@ -194,6 +194,14 @@ def par_geds_hit_aoe() -> None:
     argparser.add_argument("--eres-file", help="eres_file", type=str, required=True)
     argparser.add_argument("--inplots", help="in_plot_path", type=str, required=False)
 
+    argparser.add_argument(
+        "--timestamp",
+        help="timestamp",
+        type=str,
+        required=False,
+        default="20000101T000000Z",
+    )
+
     argparser.add_argument("--log", help="log_file", type=str)
     argparser.add_argument(
         "--log-config", help="Log config file", type=str, required=False, default={}
@@ -295,19 +303,10 @@ def par_geds_hit_aoe() -> None:
         aoe = None
         plot_dict = out_plot_dict
         results_dict = {}
-
     if args.plot_file:
-        common_dict = plot_dict.pop("common") if "common" in list(plot_dict) else None
-        out_plot_dict.update({"aoe": plot_dict})
-
-        if "common" in list(out_plot_dict) and common_dict is not None:
-            out_plot_dict["common"].update(common_dict)
-        elif common_dict is not None:
-            out_plot_dict["common"] = common_dict
-
         Path(args.plot_file).parent.mkdir(parents=True, exist_ok=True)
         with Path(args.plot_file).open("wb") as w:
-            pkl.dump(out_plot_dict, w, protocol=pkl.HIGHEST_PROTOCOL)
+            pkl.dump(plot_dict, w, protocol=pkl.HIGHEST_PROTOCOL)
 
     Path(args.hit_pars).parent.mkdir(parents=True, exist_ok=True)
     final_hit_dict = {

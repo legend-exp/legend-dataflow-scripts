@@ -472,6 +472,7 @@ def par_geds_hit_ecal() -> None:
     )
 
     argparser.add_argument("--table-name", help="table name", type=str, required=True)
+    argparser.add_argument("--channel", help="channel", type=str)
 
     argparser.add_argument("--plot-path", help="plot_path", type=str, required=False)
     argparser.add_argument("--save-path", help="save_path", type=str)

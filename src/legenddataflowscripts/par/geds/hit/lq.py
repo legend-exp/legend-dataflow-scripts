@@ -231,6 +231,13 @@ def par_geds_hit_lq() -> None:
     )
 
     argparser.add_argument("--table-name", help="table name", type=str, required=True)
+    argparser.add_argument(
+        "--timestamp",
+        help="timestamp",
+        type=str,
+        required=False,
+        default="20000101T000000Z",
+    )
 
     argparser.add_argument("--plot-file", help="plot_file", type=str, required=False)
     argparser.add_argument("--hit-pars", help="hit_pars", type=str)
@@ -292,7 +299,7 @@ def par_geds_hit_lq() -> None:
 
         data["run_timestamp"] = args.timestamp
 
-        out_dicts, results_dicts, plot_dicts, lq_dict = run_lq_calibration(
+        out_dicts, results_dicts, lq_dict, plot_dicts = run_lq_calibration(
             data,
             cal_dicts={args.timestamp: cal_dict},
             results_dicts={args.timestamp: eres_dict},
