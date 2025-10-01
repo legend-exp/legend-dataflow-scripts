@@ -345,7 +345,7 @@ def par_geds_hit_qc() -> None:
         with Path(args.cal_files[0]).open() as f:
             cal_files = f.read().splitlines()
     else:
-        cal_files = args.fft_files
+        cal_files = args.cal_files
 
     start = time.time()
     log.info("starting qc")
