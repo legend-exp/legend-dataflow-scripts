@@ -96,7 +96,7 @@ def par_geds_dsp_evtsel() -> None:
         help="raw calibration curve file(s)",
         type=str,
         nargs="*",
-        required=True,
+        required=False,
     )
 
     argparser.add_argument("--log", help="log_file", type=str)
@@ -143,10 +143,6 @@ def par_geds_dsp_evtsel() -> None:
             files = f.read().splitlines()
         raw_files = sorted(files)
 
-        raw_dict = Props.read_from(args.raw_cal_curve)[args.channel]["pars"][
-            "operations"
-        ]
-
         peaks_kev = peak_dict["peaks"]
         kev_widths = peak_dict["kev_widths"]
         cut_parameters = peak_dict["cut_parameters"]
@@ -185,6 +181,34 @@ def par_geds_dsp_evtsel() -> None:
                 True,
                 False,
             )
+
+        if args.raw_cal_curve:
+            raw_dict = Props.read_from(args.raw_cal_curve)[args.channel]["pars"][
+                "operations"
+            ]
+        else:
+            E_uncal = tb.daqenergy.nda
+            E_uncal = E_uncal[E_uncal > 200]
+            guess_keV = 2620 / np.nanpercentile(E_uncal, 99)  # usual simple guess
+
+            # daqenergy is an int so use integer binning (dx used to be bugged as output so switched to nbins)
+
+            hpge_cal = pgc.HPGeCalibration(
+                "daqenergy",
+                peaks_kev,
+                guess_keV,
+                0,
+                uncal_is_int=True,
+            )
+
+            hpge_cal.hpge_find_energy_peaks(E_uncal, etol_kev=5)
+            roughpars = hpge_cal.pars
+            raw_dict = {
+                "daqenergy_cal": {
+                    "expression": "daqenergy*a",
+                    "parameters": {"a": round(float(roughpars[1]), 5)},
+                }
+            }
 
         for outname, info in raw_dict.items():
             outcol = tb.eval(info["expression"], info.get("parameters", None))
