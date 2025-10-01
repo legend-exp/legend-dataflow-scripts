@@ -62,6 +62,7 @@ def par_geds_dsp_pz() -> None:
     if kwarg_dict["run_tau"] is True:
         dsp_config = Props.read_from(args.processing_chain)
         kwarg_dict.pop("run_tau")
+        input_file = []
         if args.pz_files is not None and len(args.pz_files) > 0:
             if (
                 isinstance(args.pz_files, list)
