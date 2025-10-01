@@ -496,7 +496,10 @@ def par_geds_hit_ecal() -> None:
 
     database_dic = Props.read_from(db_files)
 
-    hit_dict.update(database_dic[args.channel]["ctc_params"])
+    if args.channel and args.channel in database_dic:
+        database_dic = database_dic[args.channel]
+
+    hit_dict.update(database_dic["ctc_params"])
 
     kwarg_dict = Props.read_from(args.config_file)
 
