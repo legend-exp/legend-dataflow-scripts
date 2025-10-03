@@ -82,7 +82,7 @@ def get_out_data(
 
 def par_geds_dsp_evtsel() -> None:
     argparser = argparse.ArgumentParser()
-    argparser.add_argument("--raw-filelist", help="raw_filelist", type=str)
+    argparser.add_argument("--raw-filelist", help="raw_filelist", type=str, nargs="*")
     argparser.add_argument(
         "--pulser-file", help="pulser-file", type=str, required=False
     )
