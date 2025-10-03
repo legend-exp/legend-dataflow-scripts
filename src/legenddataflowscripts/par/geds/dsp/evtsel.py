@@ -139,8 +139,16 @@ def par_geds_dsp_evtsel() -> None:
     if peak_dict.pop("run_selection") is True:
         log.debug("Starting peak selection")
 
-        with Path(args.raw_filelist).open() as f:
-            files = f.read().splitlines()
+        if (
+            isinstance(args.raw_filelist, list)
+            and args.raw_filelist[0].split(".")[-1] == "filelist"
+        ):
+            files = args.raw_filelist[0]
+            with Path(files).open() as f:
+                files = f.read().splitlines()
+        else:
+            files = args.raw_filelist
+
         raw_files = sorted(files)
 
         peaks_kev = peak_dict["peaks"]
