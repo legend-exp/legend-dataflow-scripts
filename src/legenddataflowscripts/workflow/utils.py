@@ -49,7 +49,8 @@ def subst_vars(
     if use_env:
         combined_var_values = dict(iter(os.environ.items()))
         combined_var_values.update(copy.copy(var_values))
-    subst_vars_impl(props, combined_var_values, ignore_missing)
+
+    return subst_vars_impl(props, combined_var_values, ignore_missing)
 
 
 def subst_vars_in_snakemake_config(workflow, config):
@@ -65,10 +66,11 @@ def subst_vars_in_snakemake_config(workflow, config):
         use_env=True,
         ignore_missing=False,
     )
-    if "system" in config:
-        config["execenv"] = config["execenv"][config["system"]]
-    else:
-        config["execenv"] = config["execenv"]["bare"]
+    if "execenv" in config:
+        if "system" in config:
+            config["execenv"] = config["execenv"][config["system"]]
+        else:
+            config["execenv"] = config["execenv"]["bare"]
 
 
 def set_last_rule_name(workflow, new_name):
