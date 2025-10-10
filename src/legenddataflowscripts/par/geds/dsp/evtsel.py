@@ -195,14 +195,15 @@ def par_geds_dsp_evtsel() -> None:
                 "operations"
             ]
         else:
-            E_uncal = tb.daqenergy.nda
+            energy_field = peak_dict.get("energy_param", "daqenergy")
+            E_uncal = tb[energy_field].nda
             E_uncal = E_uncal[E_uncal > 200]
             guess_keV = 2620 / np.nanpercentile(E_uncal, 99)  # usual simple guess
 
             # daqenergy is an int so use integer binning (dx used to be bugged as output so switched to nbins)
 
             hpge_cal = pgc.HPGeCalibration(
-                "daqenergy",
+                energy_field,
                 peaks_kev,
                 guess_keV,
                 0,
@@ -213,7 +214,7 @@ def par_geds_dsp_evtsel() -> None:
             roughpars = hpge_cal.pars
             raw_dict = {
                 "daqenergy_cal": {
-                    "expression": "daqenergy*a",
+                    "expression": f"{energy_field}*a",
                     "parameters": {"a": round(float(roughpars[1]), 5)},
                 }
             }
