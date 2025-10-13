@@ -42,6 +42,10 @@ def build_filedb() -> None:
         ignore = []
 
     fdb = FileDB(config, scan=False)
+    try:
+        fdb.scan_files([args.scan_path])
+    except Exception as e:
+        raise RuntimeError(f"error when building {args.output} from {args.scan_path}") from e
     fdb.scan_files([args.scan_path])
     fdb.scan_tables_columns(dir_files_conform=True)
 
@@ -86,7 +90,7 @@ def build_filedb() -> None:
         if (
             (loc_timestamps == default).all() or not found
         ) and row.raw_file not in ignore:
-            msg = "something went wrong! no valid first timestamp found. Likely: the file is empty"
+            msg = "something went wrong! no valid first timestamp found. Likely: the file {row.raw_file} is empty"
             raise RuntimeError(msg)
 
         timestamps[i] = np.min(loc_timestamps)
@@ -97,7 +101,7 @@ def build_filedb() -> None:
         if (
             timestamps[i] < 0 or timestamps[i] > 4102444800
         ) and row.raw_file not in ignore:
-            msg = f"something went wrong! timestamp {timestamps[i]} does not make sense"
+            msg = f"something went wrong! timestamp {timestamps[i]} does not make sense in {row.raw_file}"
             raise RuntimeError(msg)
 
     fdb.df["first_timestamp"] = timestamps
