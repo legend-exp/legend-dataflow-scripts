@@ -21,7 +21,6 @@ from ....utils import (
 
 def par_geds_dsp_pz() -> None:
     argparser = argparse.ArgumentParser()
-    argparser.add_argument("--configs", help="configs path", type=str, required=True)
     argparser.add_argument("--log", help="log file", type=str)
     argparser.add_argument(
         "-p", "--no-pulse", help="no pulser present", action="store_true"
