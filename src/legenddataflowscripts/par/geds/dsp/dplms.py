@@ -37,6 +37,10 @@ def par_geds_dsp_dplms() -> None:
         "--config-file", help="Config file", type=str, nargs="*", required=True
     )
 
+
+    argparser.add_argument(
+        "--channel", help="channel", type=str, required=True
+    )
     argparser.add_argument(
         "--raw-table-name", help="raw table name", type=str, required=True
     )
