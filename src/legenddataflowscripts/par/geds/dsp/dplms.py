@@ -57,7 +57,7 @@ def par_geds_dsp_dplms() -> None:
     t0 = time.time()
 
     dplms_dict = Props.read_from(args.config_file)
-    db_dict = Props.read_from(args.decay_const)
+    db_dict = Props.read_from(args.database)
 
     if dplms_dict["run_dplms"] is True:
         with Path(args.fft_raw_filelist).open() as f:
