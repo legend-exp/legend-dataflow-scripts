@@ -52,7 +52,7 @@ def par_geds_dsp_nopt() -> None:
     t0 = time.time()
 
     opt_dict = Props.read_from(args.config_file)
-    db_dict = Props.read_from(args.decay_const)
+    db_dict = Props.read_from(args.database)
 
     if opt_dict.pop("run_nopt") is True:
         with Path(args.raw_filelist).open() as f:
