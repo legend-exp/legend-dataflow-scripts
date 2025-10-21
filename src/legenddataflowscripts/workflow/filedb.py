@@ -45,7 +45,9 @@ def build_filedb() -> None:
     try:
         fdb.scan_files([args.scan_path])
     except Exception as e:
-        raise RuntimeError(f"error when building {args.output} from {args.scan_path}") from e
+        raise RuntimeError(
+            f"error when building {args.output} from {args.scan_path}"
+        ) from e
     fdb.scan_files([args.scan_path])
     fdb.scan_tables_columns(dir_files_conform=True)
 

@@ -171,8 +171,8 @@ def build_tier_dsp() -> None:
 
     else:
         build_dsp(
-            raw_in = args.input,
-            dsp_out = args.output,
+            raw_in=args.input,
+            dsp_out=args.output,
             database=database_dict,
             chan_config=dsp_cfg_tbl_dict,
             write_mode="r",
