@@ -71,7 +71,7 @@ def plot_2614_timemap(
             norm=LogNorm(),
         )
 
-    ticks, labels = plt.xticks()
+    ticks, _ = plt.xticks()
     plt.xlabel(
         f"Time starting : {datetime.utcfromtimestamp(ticks[0]).strftime('%d/%m/%y %H:%M')}"
     )
@@ -125,7 +125,7 @@ def plot_pulser_timemap(
             norm=LogNorm(),
         )
         plt.ylim([mean - n_spread * spread, mean + n_spread * spread])
-    ticks, labels = plt.xticks()
+    ticks, _ = plt.xticks()
     plt.xlabel(
         f"Time starting : {datetime.utcfromtimestamp(ticks[0]).strftime('%d/%m/%y %H:%M')}"
     )
@@ -264,7 +264,7 @@ def bin_survival_fraction(
         data.query(selection_string)[cal_energy_param],
         bins=np.arange(erange[0], erange[1] + dx, dx),
     )
-    counts_fail, bins_fail, _ = pgh.get_hist(
+    counts_fail, _, _ = pgh.get_hist(
         data.query(f"(~{cut_field})&(~{pulser_field})")[cal_energy_param],
         bins=np.arange(erange[0], erange[1] + dx, dx),
     )
@@ -303,7 +303,7 @@ def plot_baseline_timemap(
         norm=LogNorm(),
     )
 
-    ticks, labels = plt.xticks()
+    ticks, _ = plt.xticks()
     plt.xlabel(
         f"Time starting : {datetime.utcfromtimestamp(ticks[0]).strftime('%d/%m/%y %H:%M')}"
     )

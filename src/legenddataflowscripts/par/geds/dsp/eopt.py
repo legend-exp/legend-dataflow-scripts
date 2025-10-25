@@ -311,7 +311,7 @@ def par_geds_dsp_eopt() -> None:
 
         optimisers = [bopt_cusp, bopt_zac, bopt_trap]
 
-        out_param_dict, out_results_list = run_bayesian_optimisation(
+        out_param_dict, _ = run_bayesian_optimisation(
             tb_data,
             dsp_config,
             [fom],
