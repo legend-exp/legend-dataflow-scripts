@@ -133,9 +133,6 @@ def par_geds_dsp_evtsel() -> None:
     db_dict = Props.read_from(args.decay_const)
 
     Path(args.peak_file).parent.mkdir(parents=True, exist_ok=True)
-    rng = np.random.default_rng()
-    rand_num = f"{rng.integers(0, 99999):05d}"
-    temp_output = f"{args.peak_file}.{rand_num}"
     if peak_dict.pop("run_selection") is True:
         log.debug("Starting peak selection")
 
@@ -166,8 +163,10 @@ def par_geds_dsp_evtsel() -> None:
         if lh5_path[-1] != "/":
             lh5_path += "/"
 
+        energy_field = peak_dict.get("energy_param", "daqenergy")
+
         tb = lh5.read(
-            lh5_path, raw_files, field_mask=["daqenergy", "t_sat_lo", "timestamp"]
+            lh5_path, raw_files, field_mask=[energy_field, "t_sat_lo", "timestamp"]
         )
 
         if args.no_pulse is False:
@@ -195,7 +194,6 @@ def par_geds_dsp_evtsel() -> None:
                 "operations"
             ]
         else:
-            energy_field = peak_dict.get("energy_param", "daqenergy")
             E_uncal = tb[energy_field].nda
             E_uncal = E_uncal[E_uncal > 200]
             guess_keV = 2620 / np.nanpercentile(E_uncal, 99)  # usual simple guess
@@ -386,7 +384,7 @@ def par_geds_dsp_evtsel() -> None:
                             lh5.write(
                                 out_tbl,
                                 name=lh5_path,
-                                lh5_file=temp_output,
+                                lh5_file=args.peak_file,
                                 wo_mode="a",
                             )
                             peak_dict["obj_buf"] = None
@@ -417,7 +415,7 @@ def par_geds_dsp_evtsel() -> None:
                             lh5.write(
                                 out_tbl,
                                 name=lh5_path,
-                                lh5_file=temp_output,
+                                lh5_file=args.peak_file,
                                 wo_mode="a",
                             )
                             peak_dict["obj_buf"] = None
@@ -432,7 +430,6 @@ def par_geds_dsp_evtsel() -> None:
                                 log.debug(msg)
 
     else:
-        Path(temp_output).touch()
+        Path(args.peak_file).touch()
     msg = f"event selection completed in {time.time() - t0} seconds"
     log.debug(msg)
-    Path(temp_output).rename(args.peak_file)
