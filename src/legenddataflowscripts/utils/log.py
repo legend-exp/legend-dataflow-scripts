@@ -39,11 +39,14 @@ def build_log(
     log_file
         The path to the log file.
     """
-    if isinstance(config_dict, str):
+    if isinstance(config_dict, str | dict):
         config_dict = {"options": {"logging": config_dict}}
+
     if "logging" in config_dict["options"]:
         log_config = config_dict["options"]["logging"]
-        log_config = Props.read_from(log_config)
+        # if it's a str, interpret it as a path to a file
+        if isinstance(log_config, str):
+            log_config = Props.read_from(log_config)
 
         if log_file is not None:
             Path(log_file).parent.mkdir(parents=True, exist_ok=True)
