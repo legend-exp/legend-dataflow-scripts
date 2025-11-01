@@ -251,14 +251,13 @@ def par_geds_hit_aoe() -> None:
         ]
 
         if "dt_param" in kwarg_dict:
-            params += kwarg_dict["dt_param"]
+            params.append(kwarg_dict["dt_param"])
         else:
             params.append("dt_eff")
 
         if "dt_cut" in kwarg_dict and kwarg_dict["dt_cut"] is not None:
             cal_dict.update(kwarg_dict["dt_cut"]["cut"])
             params.append(kwarg_dict["dt_cut"]["out_param"])
-
         # load data in
         data, threshold_mask = load_data(
             files,
@@ -271,9 +270,12 @@ def par_geds_hit_aoe() -> None:
         msg = f"Loaded {len(data)} events"
         log.info(msg)
 
-        mask = get_pulser_mask(
-            pulser_file=args.pulser_file,
-        )
+        if args.pulser_file is not None:
+            mask = get_pulser_mask(
+                pulser_file=args.pulser_file,
+            )
+        else:
+            mask = np.zeros(len(threshold_mask), dtype=bool)
 
         data["is_pulser"] = mask[threshold_mask]
 

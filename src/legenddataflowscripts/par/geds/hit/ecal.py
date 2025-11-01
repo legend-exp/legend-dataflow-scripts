@@ -532,9 +532,12 @@ def par_geds_hit_ecal() -> None:
         cal_energy_param="trapTmax",
     )
 
-    mask = get_pulser_mask(
-        pulser_file=args.pulser_file,
-    )
+    if args.pulser_file is not None:
+        mask = get_pulser_mask(
+            pulser_file=args.pulser_file,
+        )
+    else:
+        mask = np.zeros(len(threshold_mask), dtype=bool)
 
     data["is_pulser"] = mask[threshold_mask]
 

@@ -288,9 +288,12 @@ def par_geds_hit_lq() -> None:
         msg = f"Loaded {len(data)} events"
         log.info(msg)
 
-        mask = get_pulser_mask(
-            pulser_file=args.pulser_file,
-        )
+        if args.pulser_file is not None:
+            mask = get_pulser_mask(
+                pulser_file=args.pulser_file,
+            )
+        else:
+            mask = np.zeros(len(threshold_mask), dtype=bool)
 
         data["is_pulser"] = mask[threshold_mask]
 

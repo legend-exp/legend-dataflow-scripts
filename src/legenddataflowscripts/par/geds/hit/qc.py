@@ -39,17 +39,18 @@ def build_qc(
 ):
     search_name = table_name if table_name[-1] == "/" else table_name + "/"
 
-    kwarg_dict_fft = config["fft_fields"]
+    kwarg_dict_fft = config.get("fft_fields", None)
     kwarg_dict_cal = config["cal_fields"]
 
     cut_fields = get_keys(
         [key.replace(search_name, "") for key in ls(cal_files[0], search_name)],
         kwarg_dict_cal["cut_parameters"],
     )
-    cut_fields += get_keys(
-        [key.replace(search_name, "") for key in ls(cal_files[0], search_name)],
-        kwarg_dict_fft["cut_parameters"],
-    )
+    if kwarg_dict_fft is not None:
+        cut_fields += get_keys(
+            [key.replace(search_name, "") for key in ls(cal_files[0], search_name)],
+            kwarg_dict_fft["cut_parameters"],
+        )
 
     if "initial_cal_cuts" in config:
         init_cal = config["initial_cal_cuts"]
@@ -147,9 +148,12 @@ def build_qc(
         cal_energy_param="trapTmax",
     )
 
-    mask = get_pulser_mask(
-        pulser_file=pulser_file,
-    )
+    if pulser_file is not None:
+        mask = get_pulser_mask(
+            pulser_file=pulser_file,
+        )
+    else:
+        mask = np.zeros(len(threshold_mask), dtype=bool)
 
     data["is_pulser"] = mask[threshold_mask]
 
@@ -289,7 +293,9 @@ def build_qc(
 def par_geds_hit_qc() -> None:
     argparser = argparse.ArgumentParser()
     argparser.add_argument("--cal-files", help="cal_files", nargs="*", type=str)
-    argparser.add_argument("--fft-files", help="fft_files", nargs="*", type=str)
+    argparser.add_argument(
+        "--fft-files", help="fft_files", nargs="*", type=str, default=[]
+    )
 
     argparser.add_argument(
         "--tcm-filelist", help="tcm_filelist", type=str, required=False
