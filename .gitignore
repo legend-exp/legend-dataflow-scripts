@@ -1,6 +1,7 @@
 src/legenddataflowscripts/_version.py
 
 # New additions go at the top!
+.vscode
 *.c
 .DS_Store
 *.npz
