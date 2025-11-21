@@ -10,13 +10,13 @@ import numpy as np
 import pygama.pargen.energy_optimisation as om  # noqa: F401
 import sklearn.gaussian_process.kernels as ker
 from dbetto.catalog import Props
+from dspeed import build_dsp
 from dspeed.units import unit_registry as ureg
 from lgdo import lh5
 from pygama.math.distributions import hpge_peak
 from pygama.pargen.dsp_optimize import (
     BayesianOptimizer,
     run_bayesian_optimisation,
-    run_one_dsp,
 )
 
 from ....utils import build_log
@@ -127,7 +127,7 @@ def par_geds_dsp_eopt() -> None:
 
         dsp_config["outputs"] = ["tp_99", "tp_0_est", "dt_eff"]
 
-        init_data = run_one_dsp(tb_data, dsp_config, db_dict=db_dict, verbosity=0)
+        init_data = build_dsp(raw_in=tb_data, dsp_config=dsp_config, database=db_dict)
         full_dt = (init_data["tp_99"].nda - init_data["tp_0_est"].nda)[idx_list[-1]]
         flat_val = np.ceil(1.1 * np.nanpercentile(full_dt, 99) / 100) / 10
 
@@ -193,7 +193,7 @@ def par_geds_dsp_eopt() -> None:
             msg = f"Initialising values {i + 1} : {db_dict}"
             log.info(msg)
 
-            tb_out = run_one_dsp(tb_data, dsp_config, db_dict=db_dict, verbosity=0)
+            tb_out = build_dsp(raw_in=tb_data, dsp_config=dsp_config, database=db_dict)
 
             res = fom(tb_out, kwarg_dict[0])
             results_cusp.append(res)

@@ -12,9 +12,9 @@ import numpy as np
 import pygama.math.histogram as pgh
 import pygama.pargen.energy_cal as pgc
 from dbetto.catalog import Props
+from dspeed import build_dsp
 from lgdo import lh5
 from pygama.pargen.data_cleaning import generate_cuts, get_keys
-from pygama.pargen.dsp_optimize import run_one_dsp
 
 from ....utils import build_log, get_pulser_mask
 
@@ -247,7 +247,7 @@ def par_geds_dsp_evtsel() -> None:
         ]
 
         log.debug("Processing data")
-        tb_data = run_one_dsp(input_data, dsp_config, db_dict=db_dict)
+        tb_data = build_dsp(raw_in=input_data, dsp_config=dsp_config, database=db_dict)
 
         if cut_parameters is not None:
             cut_dict = generate_cuts(tb_data, cut_parameters)
@@ -297,8 +297,10 @@ def par_geds_dsp_evtsel() -> None:
                         peak_dict["obj_buf_start"] += n_rows_read_i
                     if peak_dict["n_rows_read"] >= 10000 or file == raw_files[-1]:
                         if "e_lower_lim" not in peak_dict:
-                            tb_out = run_one_dsp(
-                                peak_dict["obj_buf"], dsp_config, db_dict=db_dict
+                            tb_out = build_dsp(
+                                raw_in=peak_dict["obj_buf"],
+                                dsp_config=dsp_config,
+                                database=db_dict,
                             )
                             energy = tb_out[energy_parameter].nda
 
@@ -396,8 +398,10 @@ def par_geds_dsp_evtsel() -> None:
                             peak_dict["obj_buf"] is not None
                             and len(peak_dict["obj_buf"]) > 0
                         ):
-                            tb_out = run_one_dsp(
-                                peak_dict["obj_buf"], dsp_config, db_dict=db_dict
+                            tb_out = build_dsp(
+                                raw_in=peak_dict["obj_buf"],
+                                dsp_config=dsp_config,
+                                database=db_dict,
                             )
                             out_tbl, n_wfs = get_out_data(
                                 peak_dict["obj_buf"],

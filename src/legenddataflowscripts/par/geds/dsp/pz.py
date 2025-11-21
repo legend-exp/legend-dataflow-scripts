@@ -7,9 +7,9 @@ from pathlib import Path
 
 import numpy as np
 from dbetto.catalog import Props
+from dspeed import build_dsp
 from lgdo import lh5
 from pygama.pargen.data_cleaning import get_cut_indexes
-from pygama.pargen.dsp_optimize import run_one_dsp
 from pygama.pargen.pz_correct import PZCorrect
 
 from ....utils import (
@@ -134,7 +134,7 @@ def par_geds_dsp_pz() -> None:
         if "frac" in dsp_config["outputs"]:
             dsp_config_optimise_removed["outputs"].remove("frac")
 
-        tb_out = run_one_dsp(tb_data, dsp_config_optimise_removed)
+        tb_out = build_dsp(raw_in=tb_data, dsp_config=dsp_config_optimise_removed)
         log.debug("Processed Data")
         cut_parameters = kwarg_dict.get("cut_parameters", None)
         if cut_parameters is not None:
