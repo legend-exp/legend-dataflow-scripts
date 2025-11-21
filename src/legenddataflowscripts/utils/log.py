@@ -50,7 +50,11 @@ def build_log(
     ):
         config_dict = {"options": {"logging": config_dict}}
 
-    if isinstance(config_dict, dict) and "options" in config_dict and "logging" in config_dict["options"]:
+    if (
+        isinstance(config_dict, dict)
+        and "options" in config_dict
+        and "logging" in config_dict["options"]
+    ):
         log_config = config_dict["options"]["logging"]
         # if it's a str, interpret it as a path to a file
         if isinstance(log_config, str):
@@ -74,8 +78,13 @@ def build_log(
                     and "root" not in log_config
                     and "loggers" not in log_config
                 ):
-                    dataflow_level = log_config["handlers"]["dataflow"].get("level", "INFO")
-                    log_config["root"] = {"level": dataflow_level, "handlers": ["dataflow"]}
+                    dataflow_level = log_config["handlers"]["dataflow"].get(
+                        "level", "INFO"
+                    )
+                    log_config["root"] = {
+                        "level": dataflow_level,
+                        "handlers": ["dataflow"],
+                    }
 
         dictConfig(log_config)
         log = logging.getLogger(config_dict["options"].get("logger", "prod"))
