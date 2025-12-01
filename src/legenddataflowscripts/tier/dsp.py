@@ -95,6 +95,8 @@ def build_tier_dsp() -> None:
         # check if the raw tables are all existing
         if len(lh5.ls(args.input, input_tbl_name)) > 0:
             dsp_cfg_tbl_dict[input_tbl_name] = Props.read_from(file)
+            msg = f"found table {input_tbl_name} in {args.input}"
+            log.debug(msg)
         else:
             msg = f"table {input_tbl_name} not found in {args.input} skipping"
             log.info(msg)
@@ -147,6 +149,8 @@ def build_tier_dsp() -> None:
             kwargs = {
                 "raw_in": args.input,
                 "dsp_out": dsp_files[i],
+                "lh5_tables": list(config.keys()),
+                "base_group": "",
                 "chan_config": config,
                 "database": database_dict,
                 "write_mode": "r",
@@ -173,6 +177,8 @@ def build_tier_dsp() -> None:
         build_dsp(
             raw_in=args.input,
             dsp_out=args.output,
+            lh5_tables=list(dsp_cfg_tbl_dict.keys()),
+            base_group="",
             database=database_dict,
             chan_config=dsp_cfg_tbl_dict,
             write_mode="r",

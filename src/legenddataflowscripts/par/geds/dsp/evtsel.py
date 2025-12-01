@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 import time
 import warnings
 from bisect import bisect_left
@@ -99,6 +100,12 @@ def par_geds_dsp_evtsel() -> None:
         required=False,
     )
 
+    argparser.add_argument(
+        "--channel",
+        type=str,
+        help="Channel to process; required if --raw-cal-curve is set",
+        required="--raw-cal-curve" in sys.argv,
+    )
     argparser.add_argument("--log", help="log_file", type=str)
 
     argparser.add_argument(
