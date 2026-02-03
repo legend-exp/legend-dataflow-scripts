@@ -63,7 +63,7 @@ def par_geds_dsp_nopt() -> None:
         energies = lh5.read_as(
             f"{args.raw_table_name}/daqenergy", raw_files, library="np"
         )
-        idxs = np.where(energies == 0)[0]
+        idxs = np.where(energies <= 10)[0]
         tb_data = lh5.read(
             args.raw_table_name, raw_files, n_rows=opt_dict["n_events"], idx=idxs
         )
