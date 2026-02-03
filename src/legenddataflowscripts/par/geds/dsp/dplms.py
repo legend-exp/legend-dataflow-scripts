@@ -65,7 +65,7 @@ def par_geds_dsp_dplms() -> None:
         energies = lh5.read_as(
             f"{args.raw_table_name}/daqenergy", fft_files, library="np"
         )
-        idxs = np.where(energies == 0)[0]
+        idxs = np.where(energies <= 10)[0]
         raw_fft = lh5.read(
             args.raw_table_name,
             fft_files,
