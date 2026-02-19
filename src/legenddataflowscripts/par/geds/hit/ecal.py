@@ -637,7 +637,7 @@ def par_geds_hit_ecal() -> None:
             tail_weight=kwarg_dict.get("tail_weight", 0),
             n_events=kwarg_dict.get("n_events", None),
             allowed_p_val=kwarg_dict.get("p_val", 0),
-            update_cal_pars=kwarg_dict.get("use_all_peaks",False),
+            update_cal_pars=kwarg_dict.get("use_all_peaks", False),
             bin_width_kev=0.5,
         )
 
