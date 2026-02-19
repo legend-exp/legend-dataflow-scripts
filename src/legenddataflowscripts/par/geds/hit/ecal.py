@@ -542,6 +542,7 @@ def par_geds_hit_ecal() -> None:
     data["is_pulser"] = mask[threshold_mask]
 
     pk_pars = [
+        (238.632, (10, 10), pgf.gauss_on_step),
         (583.191, (20, 20), pgf.hpge_peak),
         (727.330, (30, 30), pgf.hpge_peak),
         (860.564, (30, 25), pgf.hpge_peak),
@@ -636,7 +637,7 @@ def par_geds_hit_ecal() -> None:
             tail_weight=kwarg_dict.get("tail_weight", 0),
             n_events=kwarg_dict.get("n_events", None),
             allowed_p_val=kwarg_dict.get("p_val", 0),
-            update_cal_pars=False,
+            update_cal_pars=kwarg_dict.get("use_all_peaks",False),
             bin_width_kev=0.5,
         )
 
