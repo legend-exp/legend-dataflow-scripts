@@ -56,6 +56,7 @@ def run_aoe_calibration(
     plot_dicts,
     config,
     debug_mode=False,
+    override_dict=None,
 ):
     if isinstance(config, str | list):
         config = Props.read_from(config)
@@ -136,7 +137,7 @@ def run_aoe_calibration(
                 }
             }
         )
-        aoe.calibrate(data, "AoE_Uncorr")
+        aoe.calibrate(data, "AoE_Uncorr", override_dict=override_dict)
 
         msg = f"A/E calibration completed in {time.time() - start:.2f} seconds"
         log.info(msg)
@@ -213,6 +214,11 @@ def par_geds_hit_aoe() -> None:
 
     argparser.add_argument("--table-name", help="table name", type=str, required=True)
 
+    argparser.add_argument("--detector", help="detector name", type=str)
+    argparser.add_argument(
+        "--override-files", help="override files", nargs="*", type=str
+    )
+
     argparser.add_argument("--plot-file", help="plot_file", type=str, required=False)
     argparser.add_argument("--hit-pars", help="hit_pars", type=str)
     argparser.add_argument("--aoe-results", help="aoe_results", type=str)
@@ -288,6 +294,10 @@ def par_geds_hit_aoe() -> None:
 
         data["run_timestamp"] = args.timestamp
 
+        if args.override.files:
+            override_dict = Props.read_from(args.override.files)
+            override_dict = override_dict.get(args.detector, None)
+
         cal_dict, results_dicts, object_dicts, plot_dicts = run_aoe_calibration(
             data,
             {args.timestamp: cal_dict},
@@ -296,6 +306,7 @@ def par_geds_hit_aoe() -> None:
             {args.timestamp: out_plot_dict},
             kwarg_dict,
             debug_mode=args.debug,
+            override_dict=override_dict,
         )
         cal_dict = cal_dict[args.timestamp]
         results_dict = results_dicts[args.timestamp]
