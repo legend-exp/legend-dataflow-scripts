@@ -51,7 +51,7 @@ Development
    :caption: Development
 
    Developer guide <developer>
-   Source Code <https://github.com/legend-exp/legend-dataflow>
+   Source Code <https://github.com/legend-exp/legend-dataflow-scripts>
 
 :doc:`developer`
    How to add new calibration scripts, Snakemake rules, and entry points.
