@@ -67,3 +67,4 @@ Related Projects
    Decoding Digitizer Data <https://legend-daq2lh5.readthedocs.io>
    Digital Signal Processing <https://dspeed.readthedocs.io>
    Pygama <https://pygama.readthedocs.io>
+   Legend-dataflow <https://legend-dataflow.readthedocs.io>

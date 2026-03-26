@@ -8,9 +8,8 @@ then merge the results before building the final analysis-ready data tiers.
 
 .. note::
 
-   The package is intended to be run through the `legend-prodenv
-   <https://github.com/legend-exp/legend-prodenv>`_ production environment,
-   which manages software installation and container execution.  Direct
+   The package is intended to be run by the `legend-dataflow
+   <https://github.com/legend-exp/legend-dataflow>`_.  Direct
    invocation of the CLI entry points is possible for development and testing.
 
 Architecture
