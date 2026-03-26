@@ -15,8 +15,8 @@ class StreamToLogger:
     Wraps a :class:`logging.Logger` so that it can be used wherever a writable
     file-like object is expected (e.g. as a replacement for :data:`sys.stderr`).
     Each call to :meth:`write` splits the incoming buffer on newlines and
-    forwards every non-empty line to the underlying logger at the configured
-    level.
+    forwards each resulting line (including empty ones) to the underlying
+    logger at the configured level.
 
     Parameters
     ----------
