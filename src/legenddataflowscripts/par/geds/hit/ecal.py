@@ -47,6 +47,32 @@ def plot_2614_timemap(
     dx=1,
     time_dx=180,
 ):
+    """Plot a 2D time-vs-energy histogram centred on the 2614 keV line.
+
+    Parameters
+    ----------
+    data : pandas.DataFrame
+        Event-level data with columns *cal_energy_param* and ``timestamp``.
+    cal_energy_param : str
+        Name of the calibrated energy column.
+    selection_string : str
+        Pandas query string applied to select physics events.
+    figsize : tuple of float
+        Figure size in inches.  Defaults to ``(8, 6)``.
+    fontsize : int
+        Base font size.  Defaults to ``12``.
+    erange : tuple of float
+        Energy range ``(low, high)`` in keV.  Defaults to ``(2580, 2630)``.
+    dx : float
+        Energy bin width in keV.  Defaults to ``1``.
+    time_dx : float
+        Time bin width in seconds.  Defaults to ``180``.
+
+    Returns
+    -------
+    matplotlib.figure.Figure
+        The generated figure.
+    """
     plt.rcParams["figure.figsize"] = figsize
     plt.rcParams["font.size"] = fontsize
 
@@ -97,6 +123,36 @@ def plot_pulser_timemap(
     time_dx=180,
     n_spread=3,
 ):
+    """Plot a 2D time-vs-energy histogram for pulser events.
+
+    Parameters
+    ----------
+    data : pandas.DataFrame
+        Event-level data including the pulser flag column.
+    cal_energy_param : str
+        Name of the calibrated energy column.
+    selection_string : str
+        Unused; kept for a consistent plot-function signature.
+    pulser_field : str
+        Boolean column name identifying pulser events.  Defaults to
+        ``"is_pulser"``.
+    figsize : tuple of float
+        Figure size in inches.
+    fontsize : int
+        Base font size.
+    dx : float
+        Energy bin width in keV.
+    time_dx : float
+        Time bin width in seconds.
+    n_spread : int
+        Half-width of the energy axis in multiples of the 10th-50th percentile
+        spread.
+
+    Returns
+    -------
+    matplotlib.figure.Figure
+        The generated figure.
+    """
     plt.rcParams["figure.figsize"] = figsize
     plt.rcParams["font.size"] = fontsize
 
@@ -158,6 +214,28 @@ def bin_pulser_stability(
     pulser_field="is_pulser",
     time_slice=180,
 ):
+    """Compute median pulser energy and its spread binned in time.
+
+    Parameters
+    ----------
+    data : pandas.DataFrame
+        Full event-level data including the pulser flag.
+    cal_energy_param : str
+        Name of the calibrated energy column.
+    selection_string : str
+        Unused; kept for a consistent plot-function signature.
+    pulser_field : str
+        Boolean column identifying pulser events.  Defaults to
+        ``"is_pulser"``.
+    time_slice : float
+        Width of each time bin in seconds.  Defaults to ``180``.
+
+    Returns
+    -------
+    dict
+        Dictionary with keys ``"time"`` (bin centres), ``"energy"`` (median
+        calibrated energy per bin), and ``"spread"`` (variance / √N per bin).
+    """
     selection = data.query(pulser_field)
 
     utime_array = data["timestamp"]
@@ -195,6 +273,28 @@ def bin_stability(
     time_slice=180,
     energy_range=(2585, 2660),
 ):
+    """Compute median energy and spread near the 2614 keV line binned in time.
+
+    Parameters
+    ----------
+    data : pandas.DataFrame
+        Event-level data with a ``timestamp`` column.
+    cal_energy_param : str
+        Name of the calibrated energy column.
+    selection_string : str
+        Pandas query string applied to select physics events.
+    time_slice : float
+        Width of each time bin in seconds.  Defaults to ``180``.
+    energy_range : tuple of float
+        ``(low, high)`` keV range used to select events near the 2614 keV
+        peak.  Defaults to ``(2585, 2660)``.
+
+    Returns
+    -------
+    dict
+        Dictionary with keys ``"time"`` (bin centres), ``"energy"`` (median
+        calibrated energy per bin), and ``"spread"`` (variance / √N per bin).
+    """
     selection = data.query(
         f"{cal_energy_param}>{energy_range[0]}&{cal_energy_param}<{energy_range[1]}&{selection_string}"
     )
@@ -236,6 +336,33 @@ def bin_spectrum(
     erange=(0, 3000),
     dx=0.5,
 ):
+    """Bin events into a calibrated energy spectrum with pass, cut, and pulser counts.
+
+    Parameters
+    ----------
+    data : pandas.DataFrame
+        Event-level data.
+    cal_energy_param : str
+        Name of the calibrated energy column.
+    selection_string : str
+        Pandas query string identifying passing physics events.
+    cut_field : str
+        Boolean column for the quality-cut acceptance flag.  Defaults to
+        ``"is_valid_cal"``.
+    pulser_field : str
+        Boolean column for the pulser flag.  Defaults to ``"is_pulser"``.
+    erange : tuple of float
+        ``(low, high)`` energy range in keV.  Defaults to ``(0, 3000)``.
+    dx : float
+        Bin width in keV.  Defaults to ``0.5``.
+
+    Returns
+    -------
+    dict
+        Dictionary with keys ``"bins"`` (bin centres), ``"counts"``
+        (passing-event histogram), ``"cut_counts"`` (events rejected by the
+        cut), and ``"pulser_counts"`` (pulser-event histogram).
+    """
     bins = np.arange(erange[0], erange[1] + dx, dx)
     return {
         "bins": pgh.get_bin_centers(bins),
@@ -260,6 +387,32 @@ def bin_survival_fraction(
     erange=(0, 3000),
     dx=6,
 ):
+    """Compute the cut survival fraction as a function of calibrated energy.
+
+    Parameters
+    ----------
+    data : pandas.DataFrame
+        Event-level data.
+    cal_energy_param : str
+        Name of the calibrated energy column.
+    selection_string : str
+        Pandas query string identifying passing physics events.
+    cut_field : str
+        Boolean column for the quality-cut acceptance flag.  Defaults to
+        ``"is_valid_cal"``.
+    pulser_field : str
+        Boolean column for the pulser flag.  Defaults to ``"is_pulser"``.
+    erange : tuple of float
+        ``(low, high)`` energy range in keV.  Defaults to ``(0, 3000)``.
+    dx : float
+        Bin width in keV.  Defaults to ``6``.
+
+    Returns
+    -------
+    dict
+        Dictionary with keys ``"bins"`` (bin centres in keV) and ``"sf"``
+        (survival fraction in percent, regularised to avoid division by zero).
+    """
     counts_pass, bins_pass, _ = pgh.get_hist(
         data.query(selection_string)[cal_energy_param],
         bins=np.arange(erange[0], erange[1] + dx, dx),
@@ -281,6 +434,31 @@ def plot_baseline_timemap(
     n_spread=5,
     time_dx=180,
 ):
+    """Plot a 2D time-vs-baseline histogram for monitoring detector baseline stability.
+
+    Parameters
+    ----------
+    data : pandas.DataFrame
+        Event-level data with columns *parameter* and ``timestamp``.
+    figsize : tuple of float
+        Figure size in inches.  Defaults to ``(8, 6)``.
+    fontsize : int
+        Base font size.  Defaults to ``12``.
+    parameter : str
+        Name of the baseline parameter to plot.  Defaults to ``"bl_mean"``.
+    dx : float
+        Baseline bin width (in ADC units).  Defaults to ``1``.
+    n_spread : int
+        Half-width of the baseline axis in multiples of the 10th-50th
+        percentile spread.  Defaults to ``5``.
+    time_dx : float
+        Time bin width in seconds.  Defaults to ``180``.
+
+    Returns
+    -------
+    matplotlib.figure.Figure
+        The generated figure.
+    """
     plt.rcParams["figure.figsize"] = figsize
     plt.rcParams["font.size"] = fontsize
 
@@ -319,6 +497,23 @@ def plot_baseline_timemap(
 
 
 def bin_bl_stability(data, time_slice=180, parameter="bl_mean"):
+    """Compute median baseline value and spread binned in time.
+
+    Parameters
+    ----------
+    data : pandas.DataFrame
+        Full event-level data with a ``timestamp`` column.
+    time_slice : float
+        Width of each time bin in seconds.  Defaults to ``180``.
+    parameter : str
+        Name of the baseline parameter.  Defaults to ``"bl_mean"``.
+
+    Returns
+    -------
+    dict
+        Dictionary with keys ``"time"`` (bin centres), ``"baseline"`` (median
+        baseline per bin), and ``"spread"`` (variance / √N per bin).
+    """
     utime_array = data["timestamp"]
     select_bls = data[parameter].to_numpy()
 
@@ -347,6 +542,27 @@ def bin_bl_stability(data, time_slice=180, parameter="bl_mean"):
 
 
 def bin_baseline(data, parameter="bl_mean-baseline", dx=1, bl_range=None):
+    """Bin an evaluated baseline-residual parameter into a histogram.
+
+    Parameters
+    ----------
+    data : pandas.DataFrame
+        Event-level data.  The expression *parameter* is evaluated with
+        :meth:`pandas.DataFrame.eval`.
+    parameter : str
+        A pandas-eval expression for the baseline residual.  Defaults to
+        ``"bl_mean-baseline"``.
+    dx : float
+        Bin width in ADC units.  Defaults to ``1``.
+    bl_range : list of float, optional
+        ``[low, high]`` range for the histogram.  Defaults to ``[-500, 500]``.
+
+    Returns
+    -------
+    dict
+        Dictionary with keys ``"bl_array"`` (histogram counts) and
+        ``"bins"`` (bin centres).
+    """
     if bl_range is None:
         bl_range = [-500, 500]
     par_array = data.eval(parameter)
@@ -356,6 +572,26 @@ def bin_baseline(data, parameter="bl_mean-baseline", dx=1, bl_range=None):
 
 
 def baseline_tracking_plots(files, lh5_path, plot_options=None):
+    """Generate baseline-tracking plots from a set of LH5 files.
+
+    Reads ``bl_mean``, ``baseline``, and ``timestamp`` from the LH5 files and
+    calls each plot function specified in *plot_options*.
+
+    Parameters
+    ----------
+    files : list of str
+        Paths to the LH5 files to read.
+    lh5_path : str
+        LH5 table path within the files.
+    plot_options : dict, optional
+        Mapping of ``{label: {"function": callable, "options": dict | None}}``.
+        When ``None`` no plots are produced.
+
+    Returns
+    -------
+    dict
+        Plot dictionary with one entry per key in *plot_options*.
+    """
     if plot_options is None:
         plot_options = {}
     plot_dict = {}
@@ -371,6 +607,22 @@ def baseline_tracking_plots(files, lh5_path, plot_options=None):
 
 
 def monitor_parameters(files, lh5_path, parameters):
+    """Compute the mode and standard deviation of selected parameters from LH5 files.
+
+    Parameters
+    ----------
+    files : list of str
+        Paths to the LH5 files to read.
+    lh5_path : str
+        LH5 table path within the files.
+    parameters : list of str
+        Column names to compute statistics for.
+
+    Returns
+    -------
+    dict
+        Mapping of ``{parameter_name: {"mode": float, "stdev": float}}``.
+    """
     data = lh5.read_as(lh5_path, files, "pd", field_mask=parameters)
     out_dict = {}
     for param in parameters:
@@ -380,6 +632,28 @@ def monitor_parameters(files, lh5_path, parameters):
 
 
 def get_results_dict(ecal_class, data, cal_energy_param, selection_string):
+    """Extract serialisable calibration results from an :class:`~pygama.pargen.energy_cal.HPGeCalibration` object.
+
+    Parameters
+    ----------
+    ecal_class : pygama.pargen.energy_cal.HPGeCalibration
+        Fitted calibration object.
+    data : pandas.DataFrame
+        Event-level data containing *cal_energy_param*.
+    cal_energy_param : str
+        Name of the calibrated energy column used to count events near the
+        FEP (2614 keV), SEP (2103 keV), and DEP (1592 keV).
+    selection_string : str
+        Pandas query string identifying physics events.
+
+    Returns
+    -------
+    dict
+        Results dictionary containing total and passing event counts at FEP,
+        SEP, and DEP; linear and quadratic FWHM curve parameters; fitted peak
+        parameters; and the list of calibrated peak energies.
+        Returns ``{}`` when the calibration failed (``NaN`` parameters).
+    """
     if np.isnan(ecal_class.pars).all():
         return {}
     results_dict = copy.deepcopy(ecal_class.results["hpge_fit_energy_peaks_1"])
@@ -445,6 +719,58 @@ def get_results_dict(ecal_class, data, cal_energy_param, selection_string):
 
 
 def par_geds_hit_ecal() -> None:
+    """Perform HPGe energy calibration and write hit-level calibration parameters.
+
+    CLI entry point registered as ``par-geds-hit-ecal``.  Loads DSP-level data
+    for a single detector channel, applies charge-trapping corrections from the
+    DSP parameter database, and runs :class:`~pygama.pargen.energy_cal.HPGeCalibration`
+    to find and fit gamma peaks, compute FWHM curves (linear and quadratic),
+    and generate per-energy-parameter calibration expressions.
+
+    The following gamma lines are used for calibration:
+
+    * 238.6 keV (²¹²Pb), 583.2 keV, 727.3 keV, 860.6 keV,
+      1592.5 keV, 1620.5 keV, 2103.5 keV, 2614.5 keV (²⁰⁸Tl)
+
+    Notes
+    -----
+    **Command-line arguments**
+
+    ``--files`` : list of str
+        DSP LH5 file(s) or file list(s).
+    ``--tcm-filelist`` : str, optional
+        Unused placeholder.
+    ``--pulser-file`` : str, optional
+        Path to the pulser mask file.
+    ``--ctc-dict`` : list of str
+        JSON/YAML file(s) with charge-trapping correction parameters keyed by
+        channel.
+    ``--in-hit-dict`` : str, optional
+        Existing hit parameter file to extend (JSON/YAML).
+    ``--inplot-dict`` : str, optional
+        Existing pickle plot file to extend.
+    ``--log`` : str, optional
+        Path to the log file.
+    ``--log-config`` : str, optional
+        Logging configuration file.
+    ``--config-file`` : list of str
+        Energy calibration configuration file(s).
+    ``--det-status`` : str
+        Detector status (``"on"`` or other); affects peak-finding tolerances.
+        Defaults to ``"on"``.
+    ``--table-name`` : str
+        LH5 table path within the DSP files.
+    ``--channel`` : str
+        Channel identifier used to look up CTC parameters.
+    ``--plot-path`` : str, optional
+        Output path for calibration diagnostic plots (pickle).
+    ``--save-path`` : str
+        Output path for the calibration hit parameters (JSON/YAML).
+    ``--results-path`` : str
+        Output path for the serialised calibration objects (pickle).
+    ``-d`` / ``--debug``
+        Enable debug mode for additional diagnostic output.
+    """
     argparser = argparse.ArgumentParser()
     argparser.add_argument("--files", help="filelist", nargs="*", type=str)
     argparser.add_argument(

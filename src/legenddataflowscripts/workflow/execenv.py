@@ -37,13 +37,39 @@ def oci_engine_env_vars(cmdenv: Mapping) -> list[str]:
 def execenv_prefix(
     config: AttrsDict, as_string: bool = True
 ) -> str | tuple[list, dict]:
-    """Returns the software environment command prefix.
+    """Return the software environment command prefix.
 
-    For example: `apptainer run image.sif`
+    Builds the command-line prefix (e.g. ``apptainer run image.sif``) and the
+    associated environment variable mapping from the ``execenv`` section of
+    *config*.  Supported container runtimes:
+
+    * **Apptainer / Singularity** - environment variables are passed via
+      ``--env=KEY=VAL`` flags and the XDG runtime directory is bind-mounted if
+      present.
+    * **OCI engines** (Docker, Podman, podman-hpc, Shifter) - environment
+      variables are passed via ``--env=KEY=VAL`` flags; the XDG runtime
+      directory is volume-mounted for all engines except Shifter.
+
+    Parameters
+    ----------
+    config : dbetto.AttrsDict
+        Workflow configuration containing an optional ``execenv`` key with
+        sub-keys ``cmd`` (container command), ``arg`` (container image/args),
+        and ``env`` (extra environment variables).
+    as_string : bool
+        When ``True`` (default) a single space-separated string with a
+        trailing space is returned.  When ``False`` a ``(cmdline, cmdenv)``
+        tuple is returned for programmatic use.
+
+    Returns
+    -------
+    str or (list, dict)
+        The command prefix as a string (with trailing space) or as a
+        ``(cmdline_list, env_dict)`` tuple.
 
     Note
     ----
-    If `as_string` is True, a space is appended to the returned string.
+    If *as_string* is ``True``, a space is appended to the returned string.
     """
     config = AttrsDict(config)
 
@@ -90,13 +116,34 @@ def execenv_prefix(
 def execenv_pyexe(
     config: AttrsDict, exename: str, as_string: bool = True
 ) -> str | tuple[list, dict]:
-    """Returns the path to an executable installed in the virtualenv.
+    """Return the full command to invoke a virtualenv executable inside the container.
 
-    For example: `apptainer run image.sif path/to/venv/bin/{exename}`
+    Extends the container prefix from :func:`execenv_prefix` with the
+    absolute path ``{config.paths.install}/bin/{exename}``.  Example result:
+    ``apptainer run image.sif /opt/sw/bin/par-geds-dsp-pz``
+
+    Parameters
+    ----------
+    config : dbetto.AttrsDict
+        Workflow configuration.  Must have a ``paths.install`` key pointing to
+        the root of the Python virtual environment.
+    exename : str
+        Name of the executable inside the virtualenv ``bin`` directory (e.g.
+        ``"par-geds-dsp-pz"``).
+    as_string : bool
+        When ``True`` (default) a single space-separated string with a
+        trailing space is returned.  When ``False`` a ``(cmdline, cmdenv)``
+        tuple is returned.
+
+    Returns
+    -------
+    str or (list, dict)
+        The full command as a string (with trailing space) or as a
+        ``(cmdline_list, env_dict)`` tuple.
 
     Note
     ----
-    If `as_string` is True, a space is appended to the returned string.
+    If *as_string* is ``True``, a space is appended to the returned string.
     """
     config = AttrsDict(config)
 
@@ -198,22 +245,33 @@ def dataflow() -> None:
 
 
 def install(args) -> None:
-    """Installs user software in the data production environment.
+    """Install user software in the data production environment.
 
-    The software packages should be specified in the `config_file` with the
-    format:
+    Creates a Python virtual environment at ``config.paths.install`` (inside
+    the container if one is configured), upgrades ``pip``, installs ``uv``,
+    and then uses ``uv pip install`` to install the packages listed in the
+    production configuration.
+
+    The packages to install should be specified in the config file under the
+    key ``pkg_versions`` (or the production workflow root directory is used
+    as the install source):
 
     .. code-block:: yaml
 
-        pkg_versions:
-          - python_package_spec
-          - ...
+       pkg_versions:
+         - python_package_spec
+         - ...
 
     .. code-block:: console
 
-      $ dataflow install config.yaml
-      $ dataflow install --editable config.yaml  # install legend-dataflow in editable mode
-      $ dataflow install --remove config.yaml  # remove install directory
+       $ dataflow install config.yaml
+       $ dataflow install --editable config.yaml   # editable install
+       $ dataflow install --remove  config.yaml    # wipe venv before installing
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parsed command-line arguments (provided by :func:`dataflow`).
     """
     config_dict = AttrsDict(dbetto.utils.load_dict(args.config_file))
     config_loc = Path(args.config_file).resolve().parent
@@ -304,7 +362,18 @@ def install(args) -> None:
 
 
 def cmdexec(args) -> None:
-    """Load the data production environment and execute a given command."""
+    """Load the data production environment and execute a given command.
+
+    Prepends the container prefix (if any) to *args.command*, adds the
+    virtualenv ``bin`` directory to ``PATH``, and runs the resulting command
+    with :func:`subprocess.run`.
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parsed command-line arguments (provided by :func:`dataflow`).
+        Must include ``config_file``, ``system``, and ``command``.
+    """
     config_dict = AttrsDict(dbetto.utils.load_dict(args.config_file))
     config_loc = Path(args.config_file).resolve().parent
 
