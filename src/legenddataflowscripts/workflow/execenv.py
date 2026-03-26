@@ -249,18 +249,8 @@ def install(args) -> None:
 
     Creates a Python virtual environment at ``config.paths.install`` (inside
     the container if one is configured), upgrades ``pip``, installs ``uv``,
-    and then uses ``uv pip install`` to install the packages listed in the
-    production configuration.
-
-    The packages to install should be specified in the config file under the
-    key ``pkg_versions`` (or the production workflow root directory is used
-    as the install source):
-
-    .. code-block:: yaml
-
-       pkg_versions:
-         - python_package_spec
-         - ...
+    and then uses ``uv pip install`` to install the workflow root directory
+    (the directory containing the config file) as the package source.
 
     .. code-block:: console
 
