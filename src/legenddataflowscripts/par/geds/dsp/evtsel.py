@@ -48,7 +48,7 @@ def get_out_data(
         Raw-tier data buffer for the current batch of events.
     dsp_data : lgdo.Table
         DSP-tier data for the same batch.
-    cut_dict : dict or None
+    cut_dict : dict
         Mapping of ``{column_name: {"expression": str, "parameters": dict}}``
         defining quality-cut columns to add to *dsp_data*.
     e_lower_lim : float
