@@ -209,6 +209,6 @@ def as_ro(config, path):
     if isinstance(path, str):
         return re.sub(*sub_pattern, path)
     if isinstance(path, Path):
-        return Path(re.sub(*sub_pattern, path.name))
+        return Path(re.sub(*sub_pattern, str(path)))
 
     return [as_ro(config, p) for p in path]
