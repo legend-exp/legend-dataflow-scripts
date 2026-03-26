@@ -28,6 +28,21 @@ warnings.filterwarnings(action="ignore", category=RuntimeWarning)
 
 
 def get_results_dict(aoe_class):
+    """Extract serialisable results from a calibrated :class:`~pygama.pargen.AoE_cal.CalAoE` object.
+
+    Parameters
+    ----------
+    aoe_class : pygama.pargen.AoE_cal.CalAoE
+        Calibrated A/E object after calling :meth:`~pygama.pargen.AoE_cal.CalAoE.calibrate`.
+
+    Returns
+    -------
+    dict
+        Mapping of run timestamp → results dictionary.  Each entry contains
+        the calibration energy parameter, drift-time parameter, correction
+        fit results, low-side and two-sided survival fractions (both overall
+        and per-run), and the A/E cut values.
+    """
     result_dict = {}
     for tstamp in aoe_class.low_side_sfs_by_run:
         result_dict[tstamp] = {
@@ -58,6 +73,52 @@ def run_aoe_calibration(
     debug_mode=False,
     override_dict=None,
 ):
+    """Run the A/E calibration and update all output dictionaries.
+
+    Instantiates :class:`~pygama.pargen.AoE_cal.CalAoE` and calls
+    :meth:`~pygama.pargen.AoE_cal.CalAoE.calibrate` on *data*.  All input
+    mapping arguments are keyed by run timestamp and the corresponding output
+    mappings are returned with the A/E results merged in.
+
+    Parameters
+    ----------
+    data : pandas.DataFrame
+        Event-level data containing the energy, current-amplitude, and
+        drift-time parameters required by the A/E calibration.
+    cal_dicts : dict
+        ``{timestamp: operations_dict}`` mapping of existing hit-level
+        calibration operations.  Updated in-place with the A/E cut
+        expressions.
+    results_dicts : dict
+        ``{timestamp: results_dict}`` mapping of calibration results from
+        preceding steps (energy calibration, partition calibration).
+    object_dicts : dict
+        ``{timestamp: object_dict}`` mapping of pickled calibration objects
+        from preceding steps.
+    plot_dicts : dict
+        ``{timestamp: plot_dict}`` mapping of existing plot dictionaries.
+    config : dict or str or list
+        A/E calibration configuration.  Must contain ``run_aoe`` (bool),
+        ``current_param``, ``energy_param``, ``cal_energy_param``,
+        ``cut_field``, and ``threshold``.
+    debug_mode : bool
+        Activates additional diagnostic output in :class:`~pygama.pargen.AoE_cal.CalAoE`.
+        Defaults to ``False``.
+    override_dict : dict, optional
+        Per-detector override parameters passed to
+        :meth:`~pygama.pargen.AoE_cal.CalAoE.calibrate`.
+
+    Returns
+    -------
+    cal_dicts : dict
+        Updated calibration operations mappings.
+    out_result_dicts : dict
+        Updated results mappings including A/E results.
+    out_object_dicts : dict
+        Updated object mappings including the ``CalAoE`` instance.
+    out_plot_dicts : dict
+        Updated plot mappings including A/E diagnostic figures.
+    """
     if isinstance(config, str | list):
         config = Props.read_from(config)
 
@@ -182,6 +243,55 @@ def run_aoe_calibration(
 
 
 def par_geds_hit_aoe() -> None:
+    """Calibrate the A/E (current-amplitude over energy) pulse-shape discriminant.
+
+    CLI entry point registered as ``par-geds-hit-aoe``.  Loads DSP data for a
+    single detector channel, applies energy and pulser masks, and runs
+    :func:`run_aoe_calibration` to derive the A/E mean, width, and cut
+    values as a function of energy and (optionally) drift time.  Results are
+    written to *hit-pars* (JSON/YAML) and the calibration object is serialised
+    to *aoe-results* (pickle).
+
+    Notes
+    -----
+    **Command-line arguments**
+
+    ``files`` : list of str
+        One or more file lists (``.filelist``) containing DSP LH5 paths.
+    ``--pulser-file`` : str, optional
+        Path to the pulser mask file.
+    ``--tcm-filelist`` : str, optional
+        Unused placeholder.
+    ``--ecal-file`` : str
+        Energy calibration output file (JSON/YAML with ``pars`` and
+        ``results`` keys).
+    ``--eres-file`` : str
+        Energy calibration pickle file containing calibration objects.
+    ``--inplots`` : str, optional
+        Existing pickle plot file to merge with A/E plots.
+    ``--timestamp`` : str
+        Run timestamp label (default ``"20000101T000000Z"``).
+    ``--log`` : str, optional
+        Path to the log file.
+    ``--log-config`` : str, optional
+        Logging configuration file.
+    ``--config-file`` : list of str
+        A/E calibration configuration file(s).
+    ``--table-name`` : str
+        LH5 table path within the DSP files.
+    ``--detector`` : str, optional
+        Detector name used to look up override parameters.
+    ``--override-files`` : list of str, optional
+        JSON/YAML file(s) with detector-specific override parameters.
+    ``--plot-file`` : str, optional
+        Output path for diagnostic plots (pickle).
+    ``--hit-pars`` : str
+        Output path for the A/E hit parameters (JSON/YAML).
+    ``--aoe-results`` : str
+        Output path for the serialised A/E calibration object (pickle).
+    ``-d`` / ``--debug``
+        Enable debug mode for additional diagnostic output.
+    """
     argparser = argparse.ArgumentParser()
     argparser.add_argument("files", help="files", nargs="*", type=str)
     argparser.add_argument(

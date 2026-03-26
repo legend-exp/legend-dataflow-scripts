@@ -15,6 +15,55 @@ from ....utils import build_log, convert_dict_np_to_float
 
 
 def par_geds_dsp_dplms() -> None:
+    """Compute DPLMS optimal filter coefficients for HPGe detectors.
+
+    CLI entry point registered as ``par-geds-dsp-dplms``.  The *Discrete
+    Prolate Laplacian Maximum Signal* (DPLMS) filter is constructed from two
+    data samples:
+
+    1. **FFT baselines** - low-energy (``daqenergy <= 10`` ADC) events from
+       dedicated FFT run files used to characterise the noise power spectrum.
+    2. **Calibration peak events** - gamma-line events read from the
+       *peak-file* produced by :func:`par_geds_dsp_evtsel`.
+
+    The coefficients are computed by
+    :func:`pygama.pargen.dplms_ge_dict.dplms_ge_dict` and written to an LH5
+    file at *lh5-path* (so that the DSP chain can load them with
+    ``loadlh5(...)``).  The DSP parameter database is updated with the filter
+    configuration and written to *dsp-pars*.
+
+    Notes
+    -----
+    **Command-line arguments**
+
+    ``--fft-raw-filelist`` : str
+        Path to a text file listing the FFT raw LH5 input files.
+    ``--peak-file`` : str
+        LH5 file containing pre-selected calibration peak events.
+    ``--inplots`` : str, optional
+        Existing pickle plot file to update with DPLMS plots.
+    ``--database`` : str
+        Path to the existing DSP parameter database (JSON/YAML).
+    ``--log`` : str, optional
+        Path to the log file.
+    ``--log-config`` : str, optional
+        Logging configuration file.
+    ``--processing-chain`` : list of str
+        Processing chain configuration file(s).
+    ``--config-file`` : list of str
+        DPLMS configuration file(s).  Must contain ``run_dplms`` (bool),
+        ``n_baselines`` (int), and ``peaks_kev`` (list).
+    ``--channel`` : str
+        Channel identifier; used as the HDF5 group name in *lh5-path*.
+    ``--raw-table-name`` : str
+        LH5 table path within the raw and peak files.
+    ``--dsp-pars`` : str
+        Output path for the updated DSP parameter database (JSON/YAML).
+    ``--lh5-path`` : str
+        Output LH5 file path for the DPLMS filter coefficients.
+    ``--plot-path`` : str, optional
+        Output path for diagnostic plots (pickle).
+    """
     argparser = argparse.ArgumentParser()
     argparser.add_argument("--fft-raw-filelist", help="fft_raw_filelist", type=str)
     argparser.add_argument("--peak-file", help="tcm_filelist", type=str, required=True)

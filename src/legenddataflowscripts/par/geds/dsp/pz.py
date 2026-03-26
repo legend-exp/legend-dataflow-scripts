@@ -20,6 +20,48 @@ from ....utils import (
 
 
 def par_geds_dsp_pz() -> None:
+    """Determine the pole-zero (PZ) decay constant(s) for HPGe waveforms.
+
+    CLI entry point registered as ``par-geds-dsp-pz``.  Selects high-energy
+    events from raw LH5 files (above an ADC threshold, excluding pulser and
+    discharge-recovery events), processes them through a preliminary DSP chain,
+    and uses :class:`pygama.pargen.pz_correct.PZCorrect` to fit either a
+    single- or double-exponential decay model to the waveform tails.
+
+    The fitted time constant(s) are written to *output-file* in JSON/YAML
+    format.  Optionally, diagnostic waveform and slope plots are serialised to
+    a pickle file at *plot-path*.
+
+    Notes
+    -----
+    **Command-line arguments**
+
+    ``--processing-chain`` : list of str
+        Processing chain configuration file(s).
+    ``--config-file`` : list of str
+        PZ calibration configuration file(s).  Must contain ``run_tau``
+        (bool), ``threshold`` (ADC), ``n_events`` (int), ``wf_field`` (str),
+        and ``mode`` (``"single"`` or ``"double"``).
+    ``--log-config`` : str, optional
+        Logging configuration file.
+    ``--raw-table-name`` : str
+        LH5 table path within the raw file (e.g. ``ch1057600/raw``).
+    ``--plot-path`` : str, optional
+        Output path for the diagnostic pickle file.
+    ``--output-file`` : str
+        Output path for the fitted PZ parameters (JSON/YAML).
+    ``--pulser-file`` : str, optional
+        Path to the pulser mask file.
+    ``-p`` / ``--no-pulse``
+        Flag indicating that no pulser is present; skips pulser masking.
+    ``--raw-files`` : list of str
+        Raw LH5 input file(s).
+    ``--pz-files`` : list of str, optional
+        Alternative input file(s) used instead of ``--raw-files`` when
+        present (e.g. pre-selected PZ calibration events).
+    ``--log`` : str, optional
+        Path to the log file.
+    """
     argparser = argparse.ArgumentParser()
     argparser.add_argument("--log", help="log file", type=str)
     argparser.add_argument(

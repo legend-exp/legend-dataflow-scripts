@@ -11,6 +11,41 @@ from pygama.flow.file_db import FileDB
 
 
 def build_filedb() -> None:
+    """Build a :class:`pygama.flow.file_db.FileDB` from a directory scan.
+
+    CLI entry point registered as ``build-filedb``.  Scans *scan-path* for raw
+    LH5 files, inspects their table/column structure, extracts the earliest
+    UNIX timestamp found in each file, validates timestamp sanity, drops any
+    files whose path matches an entry in the ignore-keys list, and writes the
+    resulting ``FileDB`` to disk.
+
+    The ``first_timestamp`` column added to the database is used downstream by
+    Snakemake to map file names to calibration validity intervals.
+
+    Notes
+    -----
+    **Command-line arguments**
+
+    ``--config`` : str
+        Path to the FileDB configuration file (JSON/YAML).
+    ``--scan-path`` : str
+        Root directory to scan for raw LH5 files.
+    ``--output`` : str
+        Path at which to write the serialised ``FileDB``.
+    ``--ignore-keys`` : str, optional
+        Path to a JSON/YAML file containing an ``unprocessable`` list of
+        substrings; any file whose path contains a listed substring is excluded.
+    ``--log`` : str, optional
+        Path to the log file.
+    ``--assume-nonsparse`` : flag
+        When set, only the first channel table is read per file (speeds up
+        scanning of non-sparse files).
+
+    Raises
+    ------
+    RuntimeError
+        If a file scan fails or if no valid timestamp can be found in a file.
+    """
     argparser = argparse.ArgumentParser()
     argparser.add_argument("--config", required=True)
     argparser.add_argument("--scan-path", required=True)

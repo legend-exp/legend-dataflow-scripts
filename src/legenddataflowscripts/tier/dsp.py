@@ -19,6 +19,19 @@ warnings.filterwarnings(action="ignore", category=RuntimeWarning)
 
 
 def _replace_list_with_array(dic):
+    """Recursively replace list values with NumPy ``float32`` arrays.
+
+    Parameters
+    ----------
+    dic : dict
+        Nested dictionary whose list values should be converted.
+
+    Returns
+    -------
+    dict
+        *dic* modified in-place, with all list values replaced by
+        :class:`numpy.ndarray` of dtype ``float32``.
+    """
     for key, value in dic.items():
         if isinstance(value, dict):
             dic[key] = _replace_list_with_array(value)
@@ -30,10 +43,62 @@ def _replace_list_with_array(dic):
 
 
 def build_dsp_wrapper(kwargs):
+    """Unpack *kwargs* and delegate to :func:`dspeed.build_dsp`.
+
+    This thin wrapper exists so that a single-argument callable can be passed
+    to :meth:`multiprocessing.Pool.map`.
+
+    Parameters
+    ----------
+    kwargs : dict
+        Keyword arguments forwarded verbatim to :func:`dspeed.build_dsp`.
+    """
     build_dsp(**kwargs)
 
 
 def build_tier_dsp() -> None:
+    """Build the DSP tier from raw LH5 data (multi-channel entry point).
+
+    CLI entry point registered as ``build-tier-dsp``.  Reads raw waveform data
+    from a single LH5 input file and runs each channel through the digital
+    signal processing (DSP) chain defined in the dataflow configuration,
+    writing the processed output to an LH5 file.
+
+    When ``--n-processes`` is greater than 1, channels are sorted by table
+    length (longest first) and distributed in round-robin fashion across worker
+    processes.  Each worker writes to a temporary shard file; the shards are
+    merged into the final output and then deleted.
+
+    Notes
+    -----
+    **Command-line arguments**
+
+    ``--configs`` : str
+        Path to the dataflow configuration directory (TextDB-compatible).
+    ``--table-map`` : str, optional
+        JSON-encoded ``{channel: lh5_table_path}`` mapping.
+    ``--log`` : str, optional
+        Path to the log file.
+    ``--alias-table`` : str, optional
+        JSON-encoded alias mapping appended to the output file via
+        :func:`~legenddataflowscripts.utils.alias_table`.
+    ``--n-processes`` : int
+        Number of parallel worker processes.  Defaults to ``1``.
+    ``--datatype`` : str
+        Data-type identifier used to select the active configuration (e.g.
+        ``cal``, ``phy``).
+    ``--timestamp`` : str
+        Run timestamp used to select the active configuration.
+    ``--tier`` : str
+        Tier label (e.g. ``dsp``).
+    ``--pars-file`` : list of str
+        Database parameter files (``.json`` / ``.yaml``) containing
+        per-channel DSP parameters.
+    ``--input`` : str
+        Path to the input raw LH5 file.
+    ``--output`` : str
+        Path for the output DSP LH5 file.
+    """
     # CLI config
     argparser = argparse.ArgumentParser()
     argparser.add_argument(
@@ -194,6 +259,38 @@ def build_tier_dsp() -> None:
 
 
 def build_tier_dsp_single_channel() -> None:
+    """Build the DSP tier from raw LH5 data (single-channel entry point).
+
+    CLI entry point registered as ``build-tier-dsp-single-channel``.
+    Processes one detector channel at a time through the DSP chain defined in
+    the dataflow configuration.  This entry point is used by single-channel
+    Snakemake rules where parallelism is managed by the workflow scheduler
+    rather than in-process multiprocessing.
+
+    Notes
+    -----
+    **Command-line arguments**
+
+    ``--configs`` : str
+        Path to the dataflow configuration directory (TextDB-compatible).
+    ``--channel`` : str, optional
+        Channel identifier to process.  When provided, channel-specific
+        configuration and parameter overrides are applied.
+    ``--log`` : str, optional
+        Path to the log file.
+    ``--datatype`` : str
+        Data-type identifier.
+    ``--timestamp`` : str
+        Run timestamp used to select the active configuration.
+    ``--tier`` : str
+        Tier label.
+    ``--pars-file`` : list of str
+        Database parameter files to load.
+    ``--input`` : str
+        Path to the input raw LH5 file.
+    ``--output`` : str
+        Path for the output DSP LH5 file.
+    """
     # CLI config
     argparser = argparse.ArgumentParser()
     argparser.add_argument(

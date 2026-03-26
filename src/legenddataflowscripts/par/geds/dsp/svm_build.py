@@ -12,6 +12,36 @@ from ....utils import build_log
 
 
 def par_geds_dsp_svm_build() -> None:
+    """Train a Support Vector Machine (SVM) classifier for HPGe pulse-shape discrimination.
+
+    CLI entry point registered as ``par-geds-dsp-svm-build``.  Loads
+    pre-processed training data from LH5 files (table ``ml_train/dsp``),
+    extracts the normalised discrete wavelet transform features
+    (``dwt_norm``) and class labels (``dc_label``), trains a
+    :class:`sklearn.svm.SVC` with configurable hyperparameters, and serialises
+    the trained model to *output-file* as a pickle file.
+
+    When no training data files are provided (``--train-data`` is empty or
+    absent) the output file is written with ``None`` as the model, acting as a
+    placeholder.
+
+    Notes
+    -----
+    **Command-line arguments**
+
+    ``--log`` : str, optional
+        Path to the log file.
+    ``--log-config`` : str, optional
+        Logging configuration file.
+    ``--output-file`` : str
+        Output path for the serialised SVM model (pickle).
+    ``--train-data`` : list of str, optional
+        LH5 file(s) containing training data under ``ml_train/dsp``.
+    ``--train-hyperpars`` : list of str, optional
+        JSON/YAML file(s) with SVM hyperparameters: ``random_state``,
+        ``kernel``, ``decision_function_shape``, ``class_weight``, ``C``,
+        and ``gamma``.
+    """
     argparser = argparse.ArgumentParser()
     argparser.add_argument("--log", help="log file", type=str)
 

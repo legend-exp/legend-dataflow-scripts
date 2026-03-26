@@ -16,6 +16,44 @@ from ....utils import build_log
 
 
 def par_geds_dsp_nopt() -> None:
+    """Optimise DSP filter parameters for noise performance.
+
+    CLI entry point registered as ``par-geds-dsp-nopt``.  Selects low-energy
+    baseline events (``daqenergy ≤ 10`` ADC) from raw LH5 files, applies
+    quality cuts derived from the preliminary DSP output, and passes the clean
+    baseline sample to :func:`pygama.pargen.noise_optimization.noise_optimization`
+    to determine optimal filter shaping parameters for noise rejection.
+
+    The resulting noise-optimisation parameters are merged with the existing
+    DSP parameter database and written to *dsp-pars*.  Optionally, diagnostic
+    plots are serialised to *plot-path*.
+
+    Notes
+    -----
+    **Command-line arguments**
+
+    ``--raw-filelist`` : str
+        Path to a text file listing the raw LH5 input files (one per line).
+    ``--database`` : str
+        Path to the existing DSP parameter database (JSON/YAML).
+    ``--inplots`` : str, optional
+        Existing pickle plot file to update with new noise-optimisation plots.
+    ``--log`` : str, optional
+        Path to the log file.
+    ``--processing-chain`` : list of str
+        Processing chain configuration file(s).
+    ``--config-file`` : list of str
+        Noise optimisation configuration file(s).  Must contain ``run_nopt``
+        (bool), ``n_events`` (int), and ``cut_pars``.
+    ``--log-config`` : str, optional
+        Logging configuration file.
+    ``--raw-table-name`` : str
+        LH5 table path within the raw file.
+    ``--dsp-pars`` : str
+        Output path for the merged DSP parameter database (JSON/YAML).
+    ``--plot-path`` : str, optional
+        Output path for diagnostic plots (pickle).
+    """
     argparser = argparse.ArgumentParser()
     argparser.add_argument("--raw-filelist", help="raw_filelist", type=str)
     argparser.add_argument("--database", help="database", type=str, required=True)

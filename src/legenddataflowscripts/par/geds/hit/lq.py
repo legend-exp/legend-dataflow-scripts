@@ -29,6 +29,20 @@ warnings.filterwarnings(action="ignore", category=RuntimeWarning)
 
 
 def get_results_dict(lq_class):
+    """Extract serialisable results from a calibrated :class:`~pygama.pargen.lq_cal.LQCal` object.
+
+    Parameters
+    ----------
+    lq_class : pygama.pargen.lq_cal.LQCal
+        Calibrated LQ object after calling :meth:`~pygama.pargen.lq_cal.LQCal.calibrate`.
+
+    Returns
+    -------
+    dict
+        Results dictionary containing the calibration energy parameter, DEP
+        mean values per run, drift-time correction fit parameters, cut fit
+        parameters, cut value, and survival fractions.
+    """
     return {
         "cal_energy_param": lq_class.cal_energy_param,
         "DEP_means": lq_class.timecorr_df.to_dict("index"),
@@ -51,40 +65,50 @@ def lq_calibration(
     plot_options: dict | None = None,
     debug_mode: bool = False,
 ):
-    """Loads in data from the provided files and runs the LQ calibration on said files
+    """Calibrate the LQ (late-charge) pulse-shape discriminant.
+
+    Constructs a :class:`~pygama.pargen.lq_cal.LQCal` instance, computes the
+    energy-normalised LQ observable ``LQ_Ecorr = lq80 / energy_param``, and
+    calls :meth:`~pygama.pargen.lq_cal.LQCal.calibrate`.  The resulting cut
+    expressions are appended to *cal_dicts*.
 
     Parameters
     ----------
-    data: pd.DataFrame
-        A dataframe containing the data used for calibrating LQ
-    cal_dicts: dict
-        A dict of hit-level operations to apply to the data
-    energy_param: string
-        The energy parameter of choice. Used for normalizing the
-        raw lq values
-    cal_energy_param: string
-        The calibrated energy parameter of choice
-    dt_param: string
-        The drift-time parameter of choice
-    eres_func: callable
-        The energy resolution functions
-    cdf: callable
-        The CDF used for the binned fitting of LQ distributions
-    cut_field: string
-        A string of flags to apply to the data when running the calibration
-    plot_options: dict
-        A dict containing the plot functions the user wants to run,and any
-        user options to provide those plot functions
+    data : pandas.DataFrame
+        Event-level data containing ``lq80``, *energy_param*, *cal_energy_param*,
+        *dt_param*, and any selection columns.
+    cal_dicts : dict
+        Mapping of run timestamps → hit-level calibration operations.
+        Updated in-place with the LQ cut expression.
+    energy_param : str
+        Raw (uncalibrated) energy parameter name used for LQ normalisation.
+    cal_energy_param : str
+        Calibrated energy parameter name.
+    dt_param : str
+        Drift-time parameter name used for the energy-dependent LQ correction.
+    eres_func : callable
+        Energy resolution function ``sigma(E)`` used to set cut windows.
+    cdf : callable
+        Cumulative distribution function used for binned LQ fitting.
+        Defaults to :func:`pygama.math.distributions.gaussian`.
+    selection_string : str
+        Pandas query string applied before calibration.  Defaults to ``""``.
+    plot_options : dict, optional
+        Mapping of ``{label: {"function": callable, "options": dict | None}}``
+        passed to :func:`~legenddataflowscripts.utils.fill_plot_dict`.
+    debug_mode : bool
+        Activates additional diagnostic output.  Defaults to ``False``.
+
     Returns
     -------
-    cal_dicts: dict
-        The user provided dict, updated with hit-level operations for LQ
-    results_dict: dict
-        A dict containing the results of the LQ calibration
-    plot_dict: dict
-        A dict containing all the figures specified by the plot options
-    lq: cal_lq class
-        The cal_lq object used for the LQ calibration
+    cal_dicts : dict
+        Updated calibration operations mapping.
+    results_dict : dict
+        LQ calibration results from :func:`get_results_dict`.
+    plot_dict : dict
+        Diagnostic figures (empty when *plot_options* is ``None``).
+    lq : pygama.pargen.lq_cal.LQCal
+        Calibrated LQ object.
     """
 
     lq = LQCal(
@@ -122,6 +146,44 @@ def run_lq_calibration(
     debug_mode=False,
     # gen_plots=True,
 ):
+    """Run the LQ calibration and update all output dictionaries.
+
+    Wraps :func:`lq_calibration` to operate on timestamp-keyed dictionaries
+    and merge LQ results into the shared output structures used by the
+    dataflow.
+
+    Parameters
+    ----------
+    data : pandas.DataFrame
+        Event-level data with the LQ, energy, drift-time, and cut columns.
+    cal_dicts : dict
+        ``{timestamp: operations_dict}`` mapping of existing hit-level
+        calibration operations.  Updated with the LQ cut expression.
+    results_dicts : dict
+        ``{timestamp: results_dict}`` mapping of preceding calibration results
+        (energy calibration and partition calibration).
+    object_dicts : dict
+        ``{timestamp: object_dict}`` mapping of pickled calibration objects.
+    plot_dicts : dict
+        ``{timestamp: plot_dict}`` mapping of existing diagnostic figures.
+    configs : dict or str or list
+        LQ calibration configuration.  Must contain ``run_lq`` (bool),
+        ``energy_param``, ``cal_energy_param``, ``cut_field``, and
+        ``dt_param``.
+    debug_mode : bool
+        Activates additional diagnostic output.  Defaults to ``False``.
+
+    Returns
+    -------
+    cal_dicts : dict
+        Updated calibration operations mappings.
+    out_result_dicts : dict
+        Updated results mappings including LQ results.
+    out_object_dicts : dict
+        Updated object mappings including the ``LQCal`` instance.
+    out_plot_dicts : dict
+        Updated plot mappings including LQ diagnostic figures.
+    """
     if isinstance(configs, str | list):
         configs = Props.read_from(configs)
 
@@ -208,6 +270,54 @@ def run_lq_calibration(
 
 
 def par_geds_hit_lq() -> None:
+    """Calibrate the LQ pulse-shape discriminant and write hit-level parameters.
+
+    CLI entry point registered as ``par-geds-hit-lq``.  Loads DSP-level data
+    for a single detector channel, applies energy threshold and pulser masks,
+    and runs :func:`run_lq_calibration` to derive the energy-normalised LQ
+    observable, its drift-time correction, and the DEP-based cut value.
+
+    Results are written to *hit-pars* (JSON/YAML) and the calibration objects
+    are serialised to *lq-results* (pickle).
+
+    Notes
+    -----
+    **Command-line arguments**
+
+    ``files`` : list of str
+        One or more file lists (``.filelist``) containing DSP LH5 paths.
+    ``--pulser-file`` : str, optional
+        Path to the pulser mask file.
+    ``--tcm-filelist`` : str, optional
+        Unused placeholder.
+    ``--ecal-file`` : str
+        Energy calibration output file (JSON/YAML with ``pars`` and
+        ``results`` keys).
+    ``--eres-file`` : str
+        Energy calibration pickle file containing calibration objects.
+    ``--inplots`` : str, optional
+        Existing pickle plot file to merge with LQ plots.
+    ``--log`` : str, optional
+        Path to the log file.
+    ``--log-config`` : str, optional
+        Logging configuration file.
+    ``--config-file`` : list of str
+        LQ calibration configuration file(s).  Must contain ``run_lq``
+        (bool), ``energy_param``, ``cal_energy_param``, ``cut_field``,
+        ``dt_param``, and ``threshold``.
+    ``--table-name`` : str
+        LH5 table path within the DSP files.
+    ``--timestamp`` : str
+        Run timestamp label.  Defaults to ``"20000101T000000Z"``.
+    ``--plot-file`` : str, optional
+        Output path for diagnostic plots (pickle).
+    ``--hit-pars`` : str
+        Output path for the LQ hit parameters (JSON/YAML).
+    ``--lq-results`` : str
+        Output path for the serialised LQ calibration object (pickle).
+    ``-d`` / ``--debug``
+        Enable debug mode for additional diagnostic output.
+    """
     argparser = argparse.ArgumentParser()
     argparser.add_argument("files", help="files", nargs="*", type=str)
     argparser.add_argument(

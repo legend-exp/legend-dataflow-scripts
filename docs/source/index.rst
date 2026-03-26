@@ -1,31 +1,67 @@
-legend-dataflow
-===============
+legend-dataflow-scripts
+=======================
 
-*legend-dataflow* is a Python package based on Snakemake
-`<https://snakemake.readthedocs.io/en/stable/index.html>`_ for running the data
-production of LEGEND.  It is designed to calibrate and optimise hundreds of
-channels in parallel before bringing them all together to process the data. It
-takes as an input the metadata at `legend metadata
-<https://github.com/legend-exp/legend-metadata>`_.
+*legend-dataflow-scripts* is a Python package based on
+`Snakemake <https://snakemake.readthedocs.io/en/stable/index.html>`_ for
+running the LEGEND data production pipeline.  It calibrates and optimises
+hundreds of HPGe detector channels in parallel before building the final
+analysis-ready data tiers.  It takes as input the detector metadata from
+`legend-metadata <https://github.com/legend-exp/legend-metadata>`_.
 
 Getting started
 ---------------
 
-It is recommended to install and use the package through the `legend-prodenv
-<https://github.com/legend-exp/legend-prodenv>`_.
+It is recommended to install the package using uv.
 
-Next steps
-----------
+For a quick development install::
+
+   uv pip install ".[docs,test]"
+
+Documentation
+-------------
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Documentation
+
+   Package overview <overview>
+   CLI entry points <callables>
+   User manual <user_manual>
+
+:doc:`overview`
+   Architecture, module descriptions, and dependency overview.
+
+:doc:`callables`
+   All command-line tools provided by the package with descriptions and usage
+   examples.
+
+:doc:`user_manual`
+   How to configure, run, and monitor the dataflow pipeline.
+
+API Reference
+-------------
 
 .. toctree::
    :maxdepth: 1
+   :caption: API reference
 
    Package API reference <api/modules>
 
-.. toctree::
-   :maxdepth: 1
+Development
+-----------
 
-   user_manual
+.. toctree::
+   :maxdepth: 2
+   :caption: Development
+
+   Developer guide <developer>
+   Source Code <https://github.com/legend-exp/legend-dataflow>
+
+:doc:`developer`
+   How to add new calibration scripts, Snakemake rules, and entry points.
+
+Related Projects
+----------------
 
 .. toctree::
    :maxdepth: 1
@@ -35,10 +71,3 @@ Next steps
    Decoding Digitizer Data <https://legend-daq2lh5.readthedocs.io>
    Digital Signal Processing <https://dspeed.readthedocs.io>
    Pygama <https://pygama.readthedocs.io>
-
-.. toctree::
-   :maxdepth: 1
-   :caption: Development
-
-   developer
-   Source Code <https://github.com/legend-exp/legend-dataflow>
