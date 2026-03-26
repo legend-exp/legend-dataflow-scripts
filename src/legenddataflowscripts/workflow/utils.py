@@ -24,8 +24,9 @@ def subst_vars_impl(x, var_values, ignore_missing=False):
     Parameters
     ----------
     x : str, dict, list, or other
-        The value to process.  Strings are expanded in-place; dicts and lists
-        are traversed recursively.  All other types are returned unchanged.
+        The value to process.  Strings are returned with substitutions applied;
+        dicts and lists are traversed and modified in place.  All other types
+        are returned unchanged.
     var_values : dict
         Mapping of variable names to substitution values.
     ignore_missing : bool
