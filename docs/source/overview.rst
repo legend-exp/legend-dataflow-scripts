@@ -65,10 +65,6 @@ Module Reference
 
 The package is organised into four sub-packages:
 
-.. contents::
-   :local:
-   :depth: 1
-
 ``legenddataflowscripts.tier``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
