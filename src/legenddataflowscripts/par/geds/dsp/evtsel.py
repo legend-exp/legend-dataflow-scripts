@@ -34,6 +34,50 @@ def get_out_data(
     final_cut_field="is_valid_cal",
     energy_param="trapTmax",
 ):
+    """Apply cuts and assemble a calibration output table for a single gamma peak.
+
+    Evaluates the expressions in *cut_dict* on *dsp_data* and *raw_dict* on
+    *raw_data*, selects events within the energy window
+    [*e_lower_lim*, *e_upper_lim*] that also pass the *final_cut_field* flag,
+    and returns a :class:`lgdo.Table` containing both the raw waveforms and
+    key reconstructed quantities.
+
+    Parameters
+    ----------
+    raw_data : lgdo.Table
+        Raw-tier data buffer for the current batch of events.
+    dsp_data : lgdo.Table
+        DSP-tier data for the same batch.
+    cut_dict : dict
+        Mapping of ``{column_name: {"expression": str, "parameters": dict}}``
+        defining quality-cut columns to add to *dsp_data*.
+    e_lower_lim : float
+        Lower ADC bound for energy window selection.
+    e_upper_lim : float
+        Upper ADC bound for energy window selection.
+    ecal_pars : float
+        ADC-to-keV conversion factor applied to ``trapTmax``.
+    raw_dict : dict
+        Mapping of ``{column_name: {"expression": str, "parameters": dict}}``
+        defining derived columns to add to *raw_data* (e.g. calibrated DAQ
+        energy).
+    peak : float
+        Nominal gamma-line energy in keV stored as a label column.
+    final_cut_field : str
+        Boolean column name in *dsp_data* used as the final event selection
+        mask.  Defaults to ``"is_valid_cal"``.
+    energy_param : str
+        DSP energy parameter used for the window selection.  Defaults to
+        ``"trapTmax"``.
+
+    Returns
+    -------
+    out_tbl : lgdo.Table
+        Table of selected events containing windowed and pre-summed waveforms
+        plus scalar quantities (timestamp, baseline, energies, peak label).
+    n_events : int
+        Number of events in *out_tbl*.
+    """
     for outname, info in cut_dict.items():
         outcol = dsp_data.eval(info["expression"], info.get("parameters", None))
         dsp_data.add_column(outname, outcol)
@@ -82,6 +126,49 @@ def get_out_data(
 
 
 def par_geds_dsp_evtsel() -> None:
+    """Select calibration peak events for DSP parameter optimisation.
+
+    CLI entry point registered as ``par-geds-dsp-evtsel``.  Scans raw LH5
+    files, applies pulser and discharge-recovery masks, performs a rough
+    energy calibration (or uses a provided calibration curve), and collects
+    events near each specified gamma-line energy.  For each peak the data are
+    run through the DSP chain to derive quality cuts, and the surviving
+    waveforms together with reconstructed quantities are written to *peak-file*
+    in LH5 format for consumption by :func:`par_geds_dsp_eopt` and
+    :func:`par_geds_dsp_dplms`.
+
+    Notes
+    -----
+    **Command-line arguments**
+
+    ``--raw-filelist`` : list of str
+        Raw LH5 input file(s) or a single ``.filelist`` file.
+    ``--pulser-file`` : str, optional
+        Path to the pulser mask file.
+    ``-p`` / ``--no-pulse``
+        Flag indicating that no pulser is present.
+    ``--decay-const`` : str
+        JSON/YAML file with the current DSP parameter database.
+    ``--raw-cal-curve`` : list of str, optional
+        Pre-computed raw calibration curve file(s).  When provided, the
+        ``--channel`` argument is also required.
+    ``--channel`` : str, optional (required with ``--raw-cal-curve``)
+        Channel identifier used to extract the calibration curve.
+    ``--log`` : str, optional
+        Path to the log file.
+    ``--processing-chain`` : list of str
+        Processing chain configuration file(s).
+    ``--config-file`` : list of str
+        Event selection configuration file(s).  Must contain ``run_selection``
+        (bool), ``peaks`` (list of keV), ``kev_widths``, ``cut_parameters``,
+        ``n_events``, and ``final_cut_field``.
+    ``--log-config`` : str, optional
+        Logging configuration file.
+    ``--raw-table-name`` : str
+        LH5 table path within the raw file.
+    ``--peak-file`` : str
+        Output LH5 file path for selected peak events.
+    """
     argparser = argparse.ArgumentParser()
     argparser.add_argument("--raw-filelist", help="raw_filelist", type=str, nargs="*")
     argparser.add_argument(

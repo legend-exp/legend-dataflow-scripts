@@ -14,6 +14,41 @@ from ..utils import alias_table, build_log
 
 
 def build_tier_hit() -> None:
+    """Build the HIT tier from DSP LH5 data (multi-channel entry point).
+
+    CLI entry point registered as ``build-tier-hit``.  Reads DSP-level LH5
+    data and computes reconstructed physics quantities (hit-level parameters)
+    for each detector channel using :func:`pygama.hit.build_hit.build_hit`.
+
+    For each channel the hit configuration file is read and then enriched with
+    per-channel calibration parameters from the provided database files before
+    being passed to the hit builder.
+
+    Notes
+    -----
+    **Command-line arguments**
+
+    ``--input`` : str
+        Path to the input DSP LH5 file.
+    ``--pars-file`` : list of str
+        Database parameter files containing per-channel hit parameters.
+    ``--configs`` : str
+        Path to the dataflow configuration directory (TextDB-compatible).
+    ``--table-map`` : str, optional
+        JSON-encoded ``{channel: lh5_table_path}`` mapping.
+    ``--log`` : str, optional
+        Path to the log file.
+    ``--alias-table`` : str, optional
+        JSON-encoded alias mapping appended to the output file.
+    ``--datatype`` : str
+        Data-type identifier.
+    ``--timestamp`` : str
+        Run timestamp used to select the active configuration.
+    ``--tier`` : str
+        Tier label (e.g. ``hit``).
+    ``--output`` : str
+        Path for the output HIT LH5 file.
+    """
     argparser = argparse.ArgumentParser()
     argparser.add_argument("--input")
     argparser.add_argument("--pars-file", nargs="*")
@@ -87,6 +122,36 @@ def build_tier_hit() -> None:
 
 
 def build_tier_hit_single_channel() -> None:
+    """Build the HIT tier from DSP LH5 data (single-channel entry point).
+
+    CLI entry point registered as ``build-tier-hit-single-channel``.
+    Processes a single detector channel, applying channel-specific hit
+    configuration and calibration parameters before calling
+    :func:`pygama.hit.build_hit.build_hit`.
+
+    Notes
+    -----
+    **Command-line arguments**
+
+    ``--input`` : str
+        Path to the input DSP LH5 file.
+    ``--pars-file`` : list of str
+        Database parameter files to load.
+    ``--configs`` : str
+        Path to the dataflow configuration directory (TextDB-compatible).
+    ``--log`` : str, optional
+        Path to the log file.
+    ``--channel`` : str, optional
+        Channel identifier to process.
+    ``--datatype`` : str
+        Data-type identifier.
+    ``--timestamp`` : str
+        Run timestamp used to select the active configuration.
+    ``--tier`` : str
+        Tier label.
+    ``--output`` : str
+        Path for the output HIT LH5 file.
+    """
     argparser = argparse.ArgumentParser()
     argparser.add_argument("--input")
     argparser.add_argument("--pars-file", nargs="*")

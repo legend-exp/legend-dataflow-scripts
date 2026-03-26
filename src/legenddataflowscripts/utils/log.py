@@ -10,7 +10,34 @@ from dbetto import Props
 
 
 class StreamToLogger:
-    """File-like stream object that redirects writes to a logger instance."""
+    """File-like stream object that redirects writes to a logger instance.
+
+    Wraps a :class:`logging.Logger` so that it can be used wherever a writable
+    file-like object is expected (e.g. as a replacement for :data:`sys.stderr`).
+    Each call to :meth:`write` splits the incoming buffer on newlines and
+    forwards each resulting line (including empty ones) to the underlying
+    logger at the configured level.
+
+    Parameters
+    ----------
+    logger : logging.Logger
+        The logger instance to write to.
+    log_level : int
+        Logging level used for every line written, e.g. ``logging.ERROR``.
+        Defaults to :data:`logging.ERROR`.
+
+    Examples
+    --------
+    Redirect ``stderr`` to a logger:
+
+    .. code-block:: python
+
+        import logging, sys
+        from legenddataflowscripts.utils import StreamToLogger
+
+        log = logging.getLogger("myapp")
+        sys.stderr = StreamToLogger(log, logging.WARNING)
+    """
 
     def __init__(self, logger, log_level=logging.ERROR):
         self.logger = logger
@@ -18,26 +45,54 @@ class StreamToLogger:
         self.linebuf = ""
 
     def write(self, buf):
+        """Write *buf* to the logger, one log record per line.
+
+        Parameters
+        ----------
+        buf : str
+            Text to forward to the logger.  Trailing whitespace is stripped
+            from each line before logging.
+        """
         for line in buf.rstrip().splitlines():
             self.logger.log(self.log_level, line.rstrip())
 
     def flush(self):
-        pass
+        """No-op flush required by the file-like interface."""
 
 
 def build_log(
     config_dict: dict | str, log_file: str | None = None, fallback: str = "prod"
 ) -> logging.Logger:
-    """Build a logger from a configuration dictionary.
+    """Build and configure a logger from a configuration dictionary.
 
-    If a log file is provided, the logger will write to that file.
+    Accepts three forms for *config_dict*:
+
+    * A **string** path to a logging properties file (JSON/YAML).
+    * A **plain logging dict** (keys ``handlers``, ``formatters``, …) as
+      consumed by :func:`logging.config.dictConfig`.
+    * A **dataflow config dict** already containing an
+      ``options`` → ``logging`` sub-key.
+
+    After the logger is created, :data:`sys.stderr` is redirected to it at
+    :data:`logging.ERROR` level, and :data:`sys.excepthook` is overridden so
+    that unhandled exceptions are written to the same file handler.
 
     Parameters
     ----------
-    config_dict
-        A dictionary containing the logging configuration.
-    log_file
-        The path to the log file.
+    config_dict : dict or str
+        Logging configuration.  See above for accepted forms.
+    log_file : str, optional
+        Path to the log file.  When provided the directory is created
+        automatically and the path is injected into the ``dataflow`` handler
+        of the logging config.
+    fallback : str
+        Logger name returned when *config_dict* does not contain a logging
+        config.  Defaults to ``"prod"``.
+
+    Returns
+    -------
+    logging.Logger
+        Configured logger instance.
     """
     # Accept either:
     # - a str pointing to a logging properties file

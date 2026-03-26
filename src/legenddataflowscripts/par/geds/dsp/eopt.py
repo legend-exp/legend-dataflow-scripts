@@ -29,6 +29,55 @@ except AttributeError:  # np < 2
 
 
 def par_geds_dsp_eopt() -> None:
+    """Optimise DSP filter parameters for energy resolution using Bayesian optimisation.
+
+    CLI entry point registered as ``par-geds-dsp-eopt``.  Reads calibration
+    peak events from an LH5 file produced by :func:`par_geds_dsp_evtsel` and
+    jointly optimises the shaping parameters (``sigma`` for CUSP and ZAC
+    filters, ``rise`` for the trapezoidal filter) and the charge-trapping
+    correction coefficient (``alpha``) for each filter type.
+
+    Optimisation uses a Gaussian-process surrogate model
+    (:class:`pygama.pargen.dsp_optimize.BayesianOptimizer`) with a configurable
+    acquisition function.  Initial samples are evaluated first; subsequent
+    iterations are selected by the acquisition function.  The optimal filter
+    parameters and CTC coefficients are written to *final-dsp-pars*, and the
+    trained optimiser objects are serialised to *qbb-grid-path*.
+
+    Notes
+    -----
+    **Command-line arguments**
+
+    ``--peak-file`` : str
+        LH5 file containing pre-selected calibration peak events (output of
+        ``par-geds-dsp-evtsel``).
+    ``--decay-const`` : str
+        JSON/YAML file with the current DSP parameter database (PZ constants,
+        etc.).
+    ``--inplots`` : str, optional
+        Existing pickle plot file to update with new optimisation plots.
+    ``--log`` : str, optional
+        Path to the log file.
+    ``--processing-chain`` : list of str
+        Processing chain configuration file(s).
+    ``--config-file`` : list of str
+        Energy optimisation configuration file(s).  Must contain ``run_eopt``
+        (bool), ``peaks`` (list of keV values), ``kev_widths``, ``fom``,
+        ``fom_field``, ``fom_err_field``, ``initial_samples``, ``acq_func``,
+        ``batch_size``, and ``n_iter``.
+    ``--log-config`` : str, optional
+        Logging configuration file.
+    ``--raw-table-name`` : str
+        LH5 table path within the peak file.
+    ``--final-dsp-pars`` : str
+        Output path for the optimised DSP parameter database (JSON/YAML).
+    ``--qbb-grid-path`` : str
+        Output path for the serialised optimiser objects (pickle).
+    ``--plot-path`` : str, optional
+        Output path for diagnostic plots (pickle).
+    ``--plot-save-path`` : str, optional
+        Alternative save path for plots.
+    """
     argparser = argparse.ArgumentParser()
 
     argparser.add_argument("--peak-file", help="tcm_filelist", type=str, required=True)
