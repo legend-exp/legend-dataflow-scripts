@@ -7,10 +7,6 @@ All CLI commands are registered as `entry points
 installed.  Each command wraps a single Python function; click on the function
 name to see its full documentation.
 
-.. contents::
-   :local:
-   :depth: 1
-
 Workflow Management
 -------------------
 

@@ -26,7 +26,6 @@ Documentation
 
    Package overview <overview>
    CLI entry points <callables>
-   User manual <user_manual>
 
 :doc:`overview`
    Architecture, module descriptions, and dependency overview.
@@ -34,9 +33,6 @@ Documentation
 :doc:`callables`
    All command-line tools provided by the package with descriptions and usage
    examples.
-
-:doc:`user_manual`
-   How to configure, run, and monitor the dataflow pipeline.
 
 API Reference
 -------------

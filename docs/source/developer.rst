@@ -1,10 +1,6 @@
 Developers Guide
 ================
 
-.. contents::
-   :local:
-   :depth: 2
-
 Snakemake Rules
 ---------------
 
