@@ -39,6 +39,9 @@ def build_log(
     log_file
         The path to the log file.
     """
+    if log_file is None:
+        return logging.getLogger(fallback)
+
     # Accept either:
     # - a str pointing to a logging properties file
     # - a plain logging dict (handlers/formatters/etc.)
@@ -60,39 +63,35 @@ def build_log(
         if isinstance(log_config, str):
             log_config = Props.read_from(log_config)
 
-        if log_file is not None:
-            Path(log_file).parent.mkdir(parents=True, exist_ok=True)
-            # Ensure the logging config has a handlers->dataflow entry; create
-            # minimal structure if needed so we can set the filename.
-            if isinstance(log_config, dict):
-                handlers = log_config.setdefault("handlers", {})
-                dataflow = handlers.setdefault("dataflow", {})
-                # Set the filename for the dataflow handler
-                dataflow["filename"] = log_file
-                dataflow.setdefault("class", "logging.FileHandler")
-                dataflow.setdefault("level", "INFO")
-                log_config.setdefault("version", 1)
-                if (
-                    "handlers" in log_config
-                    and "dataflow" in log_config["handlers"]
-                    and "root" not in log_config
-                    and "loggers" not in log_config
-                ):
-                    dataflow_level = log_config["handlers"]["dataflow"].get(
-                        "level", "INFO"
-                    )
-                    log_config["root"] = {
-                        "level": dataflow_level,
-                        "handlers": ["dataflow"],
-                    }
+        Path(log_file).parent.mkdir(parents=True, exist_ok=True)
+        # Ensure the logging config has a handlers->dataflow entry; create
+        # minimal structure if needed so we can set the filename.
+        if isinstance(log_config, dict):
+            handlers = log_config.setdefault("handlers", {})
+            dataflow = handlers.setdefault("dataflow", {})
+            # Set the filename for the dataflow handler
+            dataflow["filename"] = log_file
+            dataflow.setdefault("class", "logging.FileHandler")
+            dataflow.setdefault("level", "INFO")
+            log_config.setdefault("version", 1)
+            if (
+                "handlers" in log_config
+                and "dataflow" in log_config["handlers"]
+                and "root" not in log_config
+                and "loggers" not in log_config
+            ):
+                dataflow_level = log_config["handlers"]["dataflow"].get("level", "INFO")
+                log_config["root"] = {
+                    "level": dataflow_level,
+                    "handlers": ["dataflow"],
+                }
 
         dictConfig(log_config)
         log = logging.getLogger(config_dict["options"].get("logger", "prod"))
 
     else:
-        if log_file is not None:
-            Path(log_file).parent.mkdir(parents=True, exist_ok=True)
-            logging.basicConfig(level=logging.INFO, filename=log_file, filemode="w")
+        Path(log_file).parent.mkdir(parents=True, exist_ok=True)
+        logging.basicConfig(level=logging.INFO, filename=log_file, filemode="w")
 
         log = logging.getLogger(fallback)
 
