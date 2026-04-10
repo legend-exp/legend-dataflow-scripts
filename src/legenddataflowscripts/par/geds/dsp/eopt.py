@@ -49,7 +49,7 @@ def par_geds_dsp_eopt() -> None:
     **Command-line arguments**
 
     ``--peak-file`` : str
-        LH5 file containing pre-selected calibration peak events (output of
+        LH5 file containing preselected calibration peak events (output of
         ``par-geds-dsp-evtsel``).
     ``--decay-const`` : str
         JSON/YAML file with the current DSP parameter database (PZ constants,

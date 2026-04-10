@@ -58,7 +58,7 @@ def par_geds_dsp_pz() -> None:
         Raw LH5 input file(s).
     ``--pz-files`` : list of str, optional
         Alternative input file(s) used instead of ``--raw-files`` when
-        present (e.g. pre-selected PZ calibration events).
+        present (e.g. preselected PZ calibration events).
     ``--log`` : str, optional
         Path to the log file.
     """

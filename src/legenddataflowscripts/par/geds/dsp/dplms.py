@@ -39,7 +39,7 @@ def par_geds_dsp_dplms() -> None:
     ``--fft-raw-filelist`` : str
         Path to a text file listing the FFT raw LH5 input files.
     ``--peak-file`` : str
-        LH5 file containing pre-selected calibration peak events.
+        LH5 file containing preselected calibration peak events.
     ``--inplots`` : str, optional
         Existing pickle plot file to update with DPLMS plots.
     ``--database`` : str
