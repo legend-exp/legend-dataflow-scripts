@@ -917,6 +917,13 @@ def par_geds_hit_ecal() -> None:
             raise ValueError(msg)
 
         guess = 2614.511 / bins[np.nanargmax(hist)]
+
+        if kwarg_dict.get("guess_offset", False) is True:
+            guess = np.array([0, guess])
+            guess[0] = hit_dict.get(
+                "guess_offset_param", "is_valid_cuspEmax_classifier"
+            )["parameters"]["a"]
+
         full_object_dict[cal_energy_param] = HPGeCalibration(
             energy_param,
             glines,
