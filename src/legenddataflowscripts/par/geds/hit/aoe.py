@@ -294,8 +294,8 @@ def par_geds_hit_aoe() -> None:
 
         data["run_timestamp"] = args.timestamp
 
-        if args.override.files:
-            override_dict = Props.read_from(args.override.files)
+        if args.override_files:
+            override_dict = Props.read_from(args.override_files)
             override_dict = override_dict.get(args.detector, None)
 
         cal_dict, results_dicts, object_dicts, plot_dicts = run_aoe_calibration(
