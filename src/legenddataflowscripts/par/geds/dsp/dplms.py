@@ -174,12 +174,13 @@ def par_geds_dsp_dplms() -> None:
             fom_func=eval(dplms_dict.get("fom_func", "pmd.gauss_on_step")),
             display=1 if args.plot_path else 0,
         )
-        if args.inplots:
-            with Path(args.inplots).open("rb") as r:
-                inplot_dict = pkl.load(r)
-            inplot_dict.update({"dplms": plot_dict})
-        else:
-            inplot_dict = {"dplms": plot_dict}
+        if args.plot_path:
+            if args.inplots:
+                with Path(args.inplots).open("rb") as r:
+                    inplot_dict = pkl.load(r)
+                inplot_dict.update({"dplms": plot_dict})
+            else:
+                inplot_dict = {"dplms": plot_dict}
 
         coeffs = out_dict["dplms"].pop("coefficients")
         dplms_pars = Table(col_dict={"coefficients": Array(coeffs)})
@@ -191,7 +192,7 @@ def par_geds_dsp_dplms() -> None:
     else:
         out_dict = {}
         dplms_pars = Table(col_dict={"coefficients": Array([])})
-        if args.inplots:
+        if args.plot_path and args.inplots:
             with Path(args.inplots).open("rb") as r:
                 inplot_dict = pkl.load(r)
         else:
