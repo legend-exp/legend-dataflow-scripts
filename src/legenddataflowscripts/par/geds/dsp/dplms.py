@@ -155,11 +155,12 @@ def par_geds_dsp_dplms() -> None:
         for cut in cut_dict:
             idxs = dsp_fft[cut].nda & idxs
 
+        selected_eidxs = eidxs[: len(dsp_fft)]
         raw_fft = lh5.read(
             args.raw_table_name,
             fft_files,
             n_rows=dplms_dict["n_baselines"],
-            idx=eidxs[idxs[: len(eidxs)]],
+            idx=selected_eidxs[idxs],
         )
 
         log.debug("Applied Cuts")
