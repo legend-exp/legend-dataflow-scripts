@@ -206,7 +206,6 @@ def par_geds_dsp_dplms() -> None:
         lh5_file=args.lh5_path,
         wo_mode="overwrite",
     )
-    raise ValueError
     Path(args.dsp_pars).parent.mkdir(parents=True, exist_ok=True)
     Props.write_to(args.dsp_pars, convert_dict_np_to_float(db_dict))
 
