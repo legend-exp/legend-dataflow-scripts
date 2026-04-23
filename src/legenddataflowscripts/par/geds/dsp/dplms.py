@@ -9,7 +9,9 @@ import numpy as np
 import pygama.math.distributions as pmd  # noqa: F401
 from dbetto.catalog import Props
 from lgdo import Array, Table, lh5
+from pygama.pargen.data_cleaning import generate_cuts
 from pygama.pargen.dplms_ge_dict import dplms_ge_dict
+from pygama.pargen.dsp_optimize import run_one_dsp
 
 from ....utils import build_log, convert_dict_np_to_float
 
@@ -114,12 +116,12 @@ def par_geds_dsp_dplms() -> None:
         energies = lh5.read_as(
             f"{args.raw_table_name}/daqenergy", fft_files, library="np"
         )
-        idxs = np.where(energies <= 10)[0]
+        eidxs = np.where(energies <= 10)[0]
         raw_fft = lh5.read(
             args.raw_table_name,
             fft_files,
             n_rows=dplms_dict["n_baselines"],
-            idx=idxs,
+            idx=eidxs,
         )
         t1 = time.time()
         msg = f"Time to load fft data {(t1 - t0):.2f} s, total events {len(raw_fft)}"
@@ -142,30 +144,43 @@ def par_geds_dsp_dplms() -> None:
         if isinstance(dsp_config, str | list):
             dsp_config = Props.read_from(dsp_config)
 
+        dsp_fft = run_one_dsp(raw_fft, dsp_config, db_dict=db_dict)
+
+        cut_dict = generate_cuts(dsp_fft, cut_dict=dplms_dict["bls_cut_pars"])
+        log.debug("Cuts are %s", cut_dict)
+        idxs = np.full(len(dsp_fft), True, dtype=bool)
+        for outname, info in cut_dict.items():
+            outcol = dsp_fft.eval(info["expression"], info.get("parameters", None))
+            dsp_fft.add_column(outname, outcol)
+        for cut in cut_dict:
+            idxs = dsp_fft[cut].nda & idxs
+
+        selected_eidxs = eidxs[: len(dsp_fft)]
+        raw_fft = lh5.read(
+            args.raw_table_name,
+            fft_files,
+            n_rows=dplms_dict["n_baselines"],
+            idx=selected_eidxs[idxs],
+        )
+
+        log.debug("Applied Cuts")
+
+        out_dict, plot_dict = dplms_ge_dict(
+            raw_fft,
+            raw_cal,
+            dsp_config,
+            db_dict,
+            dplms_dict,
+            fom_func=eval(dplms_dict.get("fom_func", "pmd.gauss_on_step")),
+            display=1 if args.plot_path else 0,
+        )
         if args.plot_path:
-            out_dict, plot_dict = dplms_ge_dict(
-                raw_fft,
-                raw_cal,
-                dsp_config,
-                db_dict,
-                dplms_dict,
-                fom_func=eval(dplms_dict.get("fom_func", "pmd.gauss_on_step")),
-                display=1,
-            )
             if args.inplots:
                 with Path(args.inplots).open("rb") as r:
                     inplot_dict = pkl.load(r)
                 inplot_dict.update({"dplms": plot_dict})
-
-        else:
-            out_dict = dplms_ge_dict(
-                raw_fft,
-                raw_cal,
-                dsp_config,
-                db_dict,
-                dplms_dict,
-                fom_func=eval(dplms_dict.get("fom_func", "pmd.gauss_on_step")),
-            )
+            else:
+                inplot_dict = {"dplms": plot_dict}
 
         coeffs = out_dict["dplms"].pop("coefficients")
         dplms_pars = Table(col_dict={"coefficients": Array(coeffs)})
@@ -177,7 +192,7 @@ def par_geds_dsp_dplms() -> None:
     else:
         out_dict = {}
         dplms_pars = Table(col_dict={"coefficients": Array([])})
-        if args.inplots:
+        if args.plot_path and args.inplots:
             with Path(args.inplots).open("rb") as r:
                 inplot_dict = pkl.load(r)
         else:
@@ -192,7 +207,6 @@ def par_geds_dsp_dplms() -> None:
         lh5_file=args.lh5_path,
         wo_mode="overwrite",
     )
-
     Path(args.dsp_pars).parent.mkdir(parents=True, exist_ok=True)
     Props.write_to(args.dsp_pars, convert_dict_np_to_float(db_dict))
 

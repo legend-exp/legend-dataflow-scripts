@@ -416,7 +416,7 @@ def par_geds_dsp_eopt() -> None:
 
         Path(args.qbb_grid_path).parent.mkdir(parents=True, exist_ok=True)
         with Path(args.qbb_grid_path).open("wb") as f:
-            pkl.dump(optimisers, f)
+            pkl.dump({"eopt": optimisers}, f, protocol=pkl.HIGHEST_PROTOCOL)
 
     else:
         Path(args.qbb_grid_path).touch()
