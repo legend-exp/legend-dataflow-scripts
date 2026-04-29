@@ -37,12 +37,14 @@ def par_geds_dsp_svm() -> None:
         "--output-file", help="output par file", type=str, required=True
     )
     argparser.add_argument(
-        "--input-file", help="input par file", type=str, required=True
+        "--input-file",
+        help="input par file",
+        type=str,  # required=True
     )
     argparser.add_argument("--svm-file", help="svm file", required=True)
     args = argparser.parse_args()
 
-    par_data = Props.read_from(args.input_file)
+    par_data = Props.read_from(args.input_file) if args.input_file else {}
 
     file = f"'$_/{Path(args.svm_file).name}'"
 
