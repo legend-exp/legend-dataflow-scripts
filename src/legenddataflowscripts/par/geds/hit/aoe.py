@@ -7,6 +7,7 @@ import pickle as pkl
 import re
 import time
 import warnings
+from copy import deepcopy
 from pathlib import Path
 
 import numpy as np
@@ -123,22 +124,9 @@ def run_aoe_calibration(
         config = Props.read_from(config)
 
     if config.get("run_aoe", True) is True:
-        if "plot_options" in config:
-            for field, item in config["plot_options"].items():
-                config["plot_options"][field]["function"] = eval(item["function"])
-
-        if "dt_cut" in config and config["dt_cut"] is not None:
-            cut_dict = config["dt_cut"]["cut"]
-            for tstamp in cal_dicts:
-                cal_dicts[tstamp].update(cut_dict)
-
-            exp = cut_dict[next(iter(cut_dict))]["expression"]
-            for key in cut_dict[next(iter(cut_dict))]["parameters"]:
-                exp = re.sub(f"(?<![a-zA-Z0-9]){key}(?![a-zA-Z0-9])", f"@{key}", exp)
-            data[next(iter(cut_dict))] = data.eval(
-                exp, local_dict=cut_dict[next(iter(cut_dict))]["parameters"]
-            )
-
+        aoe_objs = {}
+        aoe_plot_dict = {}
+        out_dicts = {}
         try:
             eres = copy.deepcopy(
                 results_dicts[next(iter(results_dicts))]["partition_ecal"][
@@ -167,65 +155,102 @@ def run_aoe_calibration(
                 def eres_func(x):
                     return x * np.nan
 
-        data["AoE_Uncorr"] = (
-            data[config["current_param"]] / data[config["energy_param"]]
-        )
+        for name, param_config in config["params"].items():
+            if "plot_options" in param_config:
+                for field, item in param_config["plot_options"].items():
+                    param_config["plot_options"][field]["function"] = eval(
+                        item["function"]
+                    )
 
-        start = time.time()
-        log.info("calibrating A/E")
+            if "dt_cut" in param_config and param_config["dt_cut"] is not None:
+                cut_dict = param_config["dt_cut"]["cut"]
+                for tstamp in cal_dicts:
+                    cal_dicts[tstamp].update(cut_dict)
 
-        aoe = CalAoE(
-            cal_dicts=cal_dicts,
-            cal_energy_param=config["cal_energy_param"],
-            eres_func=eres_func,
-            pdf=eval(config.get("pdf", "aoe_peak")),
-            mean_func=eval(config.get("mean_func", "Pol1")),
-            sigma_func=eval(config.get("sigma_func", "SigmaFit")),
-            selection_string=f"{config['cut_field']}&(~is_pulser)",
-            dt_corr=config.get("dt_corr", False),
-            dep_correct=config.get("dep_correct", False),
-            dt_cut=config.get("dt_cut", None),
-            dt_param=config.get("dt_param", 3),
-            high_cut_val=config.get("high_cut_val", 3),
-            compt_bands_width=config.get("debug_mode", 20),
-            debug_mode=debug_mode | config.get("debug_mode", False),
-        )
-        aoe.update_cal_dicts(
-            {
-                "AoE_Uncorr": {
-                    "expression": f"{config['current_param']}/{config['energy_param']}",
-                    "parameters": {},
+                exp = cut_dict[next(iter(cut_dict))]["expression"]
+                for key in cut_dict[next(iter(cut_dict))]["parameters"]:
+                    exp = re.sub(
+                        f"(?<![a-zA-Z0-9]){key}(?![a-zA-Z0-9])", f"@{key}", exp
+                    )
+                data[next(iter(cut_dict))] = data.eval(
+                    exp, local_dict=cut_dict[next(iter(cut_dict))]["parameters"]
+                )
+
+            initial_param = (
+                "AoE_uncorr"
+                if param_config.get("suffix", None) is None
+                else f"AoE_Uncorr_{param_config['suffix']}"
+            )
+            data[initial_param] = (
+                data[param_config["current_param"]] / data[param_config["energy_param"]]
+            )
+
+            start = time.time()
+            log.info("calibrating A/E")
+
+            aoe = CalAoE(
+                cal_dicts=cal_dicts,
+                cal_energy_param=config["cal_energy_param"],
+                eres_func=eres_func,
+                pdf=eval(param_config.get("pdf", "aoe_peak")),
+                mean_func=eval(param_config.get("mean_func", "Pol1")),
+                sigma_func=eval(param_config.get("sigma_func", "SigmaFit")),
+                selection_string=f"{config['cut_field']}&(~is_pulser)",
+                dt_corr=param_config.get("dt_corr", False),
+                dep_correct=param_config.get("dep_correct", False),
+                dt_cut=param_config.get("dt_cut", None),
+                dt_param=param_config.get("dt_param", 3),
+                high_cut_val=param_config.get("high_cut_val", 3),
+                compt_bands_width=config.get("debug_mode", 20),
+                debug_mode=debug_mode | config.get("debug_mode", False),
+            )
+            aoe.update_cal_dicts(
+                {
+                    initial_param: {
+                        "expression": f"{param_config['current_param']}/{param_config['energy_param']}",
+                        "parameters": {},
+                    }
                 }
-            }
-        )
-        aoe.calibrate(data, "AoE_Uncorr", override_dict=override_dict)
+            )
+            aoe.calibrate(
+                data,
+                initial_param,
+                override_dict=override_dict,
+                suffix=param_config.get("suffix", None),
+            )
 
-        msg = f"A/E calibration completed in {time.time() - start:.2f} seconds"
-        log.info(msg)
+            msg = f"A/E calibration completed in {time.time() - start:.2f} seconds"
+            log.info(msg)
 
-        out_dict = get_results_dict(aoe)
-        aoe_plot_dict = fill_plot_dict(aoe, data, config.get("plot_options", None))
+            out_dicts[name] = get_results_dict(aoe)
+            aoe_plots = fill_plot_dict(
+                aoe, data, param_config.get("plot_options", None)
+            )
 
-        aoe.pdf = aoe.pdf.name
-        # need to change eres func as can't pickle lambdas
-        try:
-            aoe.eres_func = results_dicts[next(iter(results_dicts))]["partition_ecal"][
-                config["cal_energy_param"]
-            ]["eres_linear"]
-        except KeyError:
-            aoe.eres_func = {}
+            aoe.pdf = aoe.pdf.name
+            # need to change eres func as can't pickle lambdas
+            try:
+                aoe.eres_func = results_dicts[next(iter(results_dicts))][
+                    "partition_ecal"
+                ][config["cal_energy_param"]]["eres_linear"]
+            except KeyError:
+                aoe.eres_func = {}
+            aoe_objs[name] = deepcopy(aoe)
+            aoe_plot_dict[name] = deepcopy(aoe_plots)
     else:
-        out_dict = dict.fromkeys(cal_dicts)
+        out_dicts = {}
+        aoe_objs = {}
         aoe_plot_dict = {}
-        aoe = None
 
     out_result_dicts = {}
     for tstamp, result_dict in results_dicts.items():
-        out_result_dicts[tstamp] = dict(**result_dict, aoe=out_dict[tstamp])
+        out_result_dicts[tstamp] = dict(
+            **result_dict, aoe={name: d[tstamp] for name, d in out_dicts.items()}
+        )
 
     out_object_dicts = {}
     for tstamp, object_dict in object_dicts.items():
-        out_object_dicts[tstamp] = dict(**object_dict, aoe=aoe)
+        out_object_dicts[tstamp] = dict(**object_dict, aoe=aoe_objs)
 
     common_dict = (
         aoe_plot_dict.pop("common") if "common" in list(aoe_plot_dict) else None
@@ -357,23 +382,23 @@ def par_geds_hit_aoe() -> None:
 
     if kwarg_dict["run_aoe"] is True:
         params = [
-            kwarg_dict["current_param"],
-            "tp_0_est",
-            "tp_99",
-            kwarg_dict["energy_param"],
             kwarg_dict["cal_energy_param"],
             kwarg_dict["cut_field"],
+            "tp_0_est",
+            "tp_99",
             "timestamp",
         ]
-
-        if "dt_param" in kwarg_dict:
-            params.append(kwarg_dict["dt_param"])
-        else:
-            params.append("dt_eff")
-
-        if "dt_cut" in kwarg_dict and kwarg_dict["dt_cut"] is not None:
-            cal_dict.update(kwarg_dict["dt_cut"]["cut"])
-            params.append(kwarg_dict["dt_cut"]["out_param"])
+        for param_config in kwarg_dict["params"].values():
+            params.append(param_config["current_param"])
+            params.append(param_config["energy_param"])
+            if "dt_param" in param_config:
+                params.append(param_config["dt_param"])
+            else:
+                params.append("dt_eff")
+            if "dt_cut" in param_config and param_config["dt_cut"] is not None:
+                cal_dict.update(param_config["dt_cut"]["cut"])
+                params.append(param_config["dt_cut"]["out_param"])
+        params = list(dict.fromkeys(params))
         # load data in
         data, threshold_mask = load_data(
             files,
