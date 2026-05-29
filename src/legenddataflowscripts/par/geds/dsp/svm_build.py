@@ -4,8 +4,8 @@ import argparse
 import pickle as pkl
 from pathlib import Path
 
+import lh5
 from dbetto.catalog import Props
-from lgdo import lh5
 from sklearn.svm import SVC
 
 from ....utils import build_log

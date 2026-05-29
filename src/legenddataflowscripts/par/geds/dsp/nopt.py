@@ -5,11 +5,11 @@ import pickle as pkl
 import time
 from pathlib import Path
 
+import lh5
 import numpy as np
 import pygama.pargen.noise_optimization as pno
 from dbetto.catalog import Props
 from dspeed import build_dsp
-from lgdo import lh5
 from pygama.pargen.data_cleaning import generate_cuts, get_cut_indexes
 
 from ....utils import build_log

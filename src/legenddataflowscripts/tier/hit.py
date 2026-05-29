@@ -5,9 +5,9 @@ import json
 import time
 from pathlib import Path
 
+import lh5
 from dbetto.catalog import Props
 from legendmeta import TextDB
-from lgdo import lh5
 from pygama.hit.build_hit import build_hit
 
 from ..utils import alias_table, build_log

@@ -156,8 +156,10 @@ Key Dependencies
    * - `pygama <https://pygama.readthedocs.io>`_
      - Calibration algorithms (energy cal, A/E, LQ, noise optimisation, etc.)
        and the HIT tier builder.
-   * - `lgdo / lh5 <https://legend-pydataobj.readthedocs.io>`_
-     - LEGEND Data Object format and LH5 file I/O.
+   * - `lgdo <https://legend-pydataobj.readthedocs.io>`_
+     - LEGEND Data Object types.
+   * - `lh5 <https://legend-lh5io.readthedocs.io>`_
+     - LH5 file I/O.
    * - `dbetto <https://dbetto.readthedocs.io>`_
      - Configuration file handling (JSON/YAML, TextDB, validity catalogs).
    * - `pylegendmeta <https://pylegendmeta.readthedocs.io>`_

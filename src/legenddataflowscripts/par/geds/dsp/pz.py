@@ -5,10 +5,10 @@ import copy
 import pickle as pkl
 from pathlib import Path
 
+import lh5
 import numpy as np
 from dbetto.catalog import Props
 from dspeed import build_dsp
-from lgdo import lh5
 from pygama.pargen.data_cleaning import get_cut_indexes
 from pygama.pargen.pz_correct import PZCorrect
 

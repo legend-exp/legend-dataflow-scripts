@@ -54,6 +54,7 @@ intersphinx_mapping = {
     "dspeed": ("https://dspeed.readthedocs.io/en/stable", None),
     "daq2lh5": ("https://legend-daq2lh5.readthedocs.io/en/stable", None),
     "lgdo": ("https://legend-pydataobj.readthedocs.io/en/stable", None),
+    "lh5": ("https://legend-lh5io.readthedocs.io/en/stable", None),
     "dbetto": ("https://dbetto.readthedocs.io/en/stable", None),
     "pylegendmeta": ("https://pylegendmeta.readthedocs.io/en/stable", None),
 }  # add new intersphinx mappings here
