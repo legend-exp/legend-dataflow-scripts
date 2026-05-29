@@ -379,7 +379,7 @@ def par_geds_dsp_evtsel() -> None:
                             lh5_path,
                             file,
                             start_row=0,
-                            idx=idx_i,
+                            idx=idx_i[0],
                             obj_buf=peak_dict["obj_buf"],
                             obj_buf_start=peak_dict["obj_buf_start"],
                         )
