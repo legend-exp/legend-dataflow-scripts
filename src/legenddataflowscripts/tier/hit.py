@@ -6,8 +6,8 @@ import time
 from pathlib import Path
 
 import lh5
+from dbetto import TextDB
 from dbetto.catalog import Props
-from legendmeta import TextDB
 from pygama.hit.build_hit import build_hit
 
 from ..utils import alias_table, build_log
@@ -96,7 +96,7 @@ def build_tier_hit() -> None:
         hit_cfg = Props.read_from(file)
 
         # get pars (to override hit config)
-        Props.add_to(hit_cfg, pars_dict.get(chan, {}).copy())
+        hit_cfg = Props.add_to(hit_cfg, pars_dict.get(chan, {}).copy())
 
         if chan in table_map:
             input_tbl_name = table_map[chan] if table_map is not None else chan + "/dsp"
@@ -203,7 +203,7 @@ def build_tier_hit_single_channel() -> None:
     )
 
     hit_cfg = Props.read_from(chan_cfg_map)
-    Props.add_to(hit_cfg, pars_dict.copy())
+    hit_cfg = Props.add_to(hit_cfg, pars_dict.copy())
 
     log.info("running build_hit()...")
     start = time.time()

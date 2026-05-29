@@ -371,7 +371,7 @@ def par_geds_dsp_eopt() -> None:
             n_iter=opt_dict["n_iter"],
         )
 
-        Props.add_to(db_dict, out_param_dict)
+        db_dict = Props.add_to(db_dict, out_param_dict)
 
         # db_dict.update(out_param_dict)
 
