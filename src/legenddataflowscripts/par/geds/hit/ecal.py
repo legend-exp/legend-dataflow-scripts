@@ -7,13 +7,13 @@ import warnings
 from datetime import datetime
 from pathlib import Path
 
+import lh5
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import pygama.math.distributions as pgf
 import pygama.math.histogram as pgh
 from dbetto.catalog import Props
-from lgdo import lh5
 from matplotlib.colors import LogNorm
 from pygama.math.distributions import nb_poly
 from pygama.pargen.data_cleaning import get_mode_stdev

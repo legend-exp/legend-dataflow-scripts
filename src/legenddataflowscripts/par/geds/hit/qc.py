@@ -11,7 +11,7 @@ from pathlib import Path
 
 import numpy as np
 from dbetto.catalog import Props
-from lgdo.lh5 import ls
+from lh5 import ls
 from pygama.pargen.data_cleaning import (
     generate_cut_classifiers,
     get_keys,

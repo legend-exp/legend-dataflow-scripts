@@ -7,11 +7,11 @@ import warnings
 from multiprocessing import Pool
 from pathlib import Path
 
+import lh5
 import numpy as np
 from dbetto import TextDB
 from dbetto.catalog import Props
 from dspeed import build_dsp
-from lgdo import lh5
 
 from ..utils import alias_table, build_log
 

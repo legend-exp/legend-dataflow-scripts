@@ -5,10 +5,11 @@ import pickle as pkl
 import time
 from pathlib import Path
 
+import lh5
 import numpy as np
 import pygama.math.distributions as pmd  # noqa: F401
 from dbetto.catalog import Props
-from lgdo import Array, Table, lh5
+from lgdo import Array, Table
 from pygama.pargen.data_cleaning import generate_cuts
 from pygama.pargen.dplms_ge_dict import dplms_ge_dict
 from pygama.pargen.dsp_optimize import run_one_dsp

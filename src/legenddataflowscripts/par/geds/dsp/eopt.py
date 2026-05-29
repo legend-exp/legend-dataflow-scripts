@@ -6,13 +6,13 @@ import time
 import warnings
 from pathlib import Path
 
+import lh5
 import numpy as np
 import pygama.pargen.energy_optimisation as om  # noqa: F401
 import sklearn.gaussian_process.kernels as ker
 from dbetto.catalog import Props
 from dspeed import build_dsp
 from dspeed.units import unit_registry as ureg
-from lgdo import lh5
 from pygama.math.distributions import hpge_peak
 from pygama.pargen.dsp_optimize import (
     BayesianOptimizer,
@@ -371,7 +371,7 @@ def par_geds_dsp_eopt() -> None:
             n_iter=opt_dict["n_iter"],
         )
 
-        Props.add_to(db_dict, out_param_dict)
+        db_dict = Props.add_to(db_dict, out_param_dict)
 
         # db_dict.update(out_param_dict)
 

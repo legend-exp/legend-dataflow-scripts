@@ -9,12 +9,12 @@ from bisect import bisect_left
 from pathlib import Path
 
 import lgdo
+import lh5
 import numpy as np
 import pygama.math.histogram as pgh
 import pygama.pargen.energy_cal as pgc
 from dbetto.catalog import Props
 from dspeed import build_dsp
-from lgdo import lh5
 from pygama.pargen.data_cleaning import generate_cuts, get_keys
 
 from ....utils import build_log, get_pulser_mask
