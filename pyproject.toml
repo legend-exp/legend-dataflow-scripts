@@ -51,11 +51,11 @@ dynamic = ["version"]
 
 dependencies = [
     "colorlog",
-    "dbetto>=1.2.3",
-    "pygama>=2.3.8",
-    "dspeed>=2.0",
-    "pylegendmeta>=1.2.5",
-    "legend-pydataobj>=1.16",
+    "dbetto>=1.3.6",
+    "pygama>=2.3.10",
+    "dspeed>=2.1.4",
+    "pylegendmeta>=1.4.4",
+    "legend-pydataobj>=2.0.2",
     "pip",
 ]
 # "legend-daq2lh5 @  file:///${PROJECT_ROOT}/software/python/src/legend-daq2lh5
