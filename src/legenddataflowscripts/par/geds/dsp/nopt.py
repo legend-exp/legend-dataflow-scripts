@@ -111,11 +111,15 @@ def par_geds_dsp_nopt() -> None:
 
         msg = f"Select baselines {len(tb_data)}"
         log.info(msg)
+        if opt_dict.get("fft_field", "wf_psd") in dsp_config["outputs"]:
+            dsp_config["outputs"].remove(opt_dict.get("fft_field", "wf_psd"))
         dsp_data = build_dsp(raw_in=tb_data, dsp_config=dsp_config)
         cut_dict = generate_cuts(dsp_data, cut_dict=opt_dict.pop("cut_pars"))
         cut_idxs = get_cut_indexes(dsp_data, cut_dict)
         n_events = opt_dict.pop("n_events")
         del tb_data, dsp_data
+        if opt_dict.get("fft_field", "wf_psd") not in dsp_config["outputs"]:
+            dsp_config["outputs"].append(opt_dict.get("fft_field", "wf_psd"))
         tb_data = lh5.read(
             args.raw_table_name,
             raw_files,
