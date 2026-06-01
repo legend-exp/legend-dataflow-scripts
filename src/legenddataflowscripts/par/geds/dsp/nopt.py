@@ -114,10 +114,12 @@ def par_geds_dsp_nopt() -> None:
         dsp_data = build_dsp(raw_in=tb_data, dsp_config=dsp_config)
         cut_dict = generate_cuts(dsp_data, cut_dict=opt_dict.pop("cut_pars"))
         cut_idxs = get_cut_indexes(dsp_data, cut_dict)
+        n_events = opt_dict.pop("n_events")
+        del tb_data, dsp_data
         tb_data = lh5.read(
             args.raw_table_name,
             raw_files,
-            n_rows=opt_dict.pop("n_events"),
+            n_rows=n_events,
             idx=idxs[cut_idxs],
         )
         msg = f"... {len(tb_data)} baselines after cuts"
@@ -134,7 +136,7 @@ def par_geds_dsp_nopt() -> None:
             )
         else:
             out_dict = pno.noise_optimization(
-                raw_files, dsp_config, db_dict.copy(), opt_dict, args.raw_table_name
+                tb_data, dsp_config, db_dict.copy(), opt_dict, args.raw_table_name
             )
 
         t2 = time.time()
