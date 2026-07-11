@@ -14,7 +14,7 @@ from pygama.pargen.data_cleaning import generate_cuts
 from pygama.pargen.dplms_ge_dict import dplms_ge_dict
 from pygama.pargen.dsp_optimize import run_one_dsp
 
-from ....utils import build_log, convert_dict_np_to_float
+from ....utils import build_log, convert_dict_np_to_float, require_config_keys
 
 
 def par_geds_dsp_dplms() -> None:
@@ -107,6 +107,7 @@ def par_geds_dsp_dplms() -> None:
 
     dplms_dict = Props.read_from(args.config_file)
     db_dict = Props.read_from(args.database)
+    require_config_keys(dplms_dict, ["run_dplms"], f"dplms config ({args.config_file})")
 
     if dplms_dict["run_dplms"] is True:
         with Path(args.fft_raw_filelist).open() as f:
