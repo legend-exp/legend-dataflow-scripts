@@ -173,6 +173,7 @@ def dataflow() -> None:
         "-v", "--verbose", help="increase verbosity", action="store_true"
     )
 
+    parser.set_defaults(func=None)
     subparsers = parser.add_subparsers()
 
     parser_install = subparsers.add_parser(
@@ -240,8 +241,22 @@ def dataflow() -> None:
         logger.setLevel(logging.DEBUG)
         logger.addHandler(handler)
 
-    if args.func:
+    if getattr(args, "func", None) is not None:
         args.func(args)
+    else:
+        parser.print_help(sys.stderr)
+        sys.exit(1)
+
+
+def _select_execenv(config_dict, system, config_file):
+    try:
+        return config_dict["execenv"][system]
+    except KeyError:
+        msg = (
+            f"system {system!r} not found under 'execenv' in {config_file}; "
+            f"available systems: {list(config_dict.get('execenv', {}))}"
+        )
+        raise KeyError(msg) from None
 
 
 def install(args) -> None:
@@ -270,7 +285,7 @@ def install(args) -> None:
         config_dict, var_values={"_": config_loc}, use_env=True, ignore_missing=False
     )
 
-    config_dict["execenv"] = config_dict.execenv[args.system]
+    config_dict["execenv"] = _select_execenv(config_dict, args.system, args.config_file)
 
     # path to virtualenv location
     path_install = config_dict.paths.install
@@ -373,7 +388,7 @@ def cmdexec(args) -> None:
         use_env=True,
         ignore_missing=False,
     )
-    config_dict["execenv"] = config_dict["execenv"][args.system]
+    config_dict["execenv"] = _select_execenv(config_dict, args.system, args.config_file)
 
     exe_path = Path(config_dict.paths.install).resolve() / "bin"
 

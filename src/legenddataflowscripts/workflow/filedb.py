@@ -72,7 +72,11 @@ def build_filedb() -> None:
     log = logging.getLogger(__name__)
 
     if args.ignore_keys is not None:
-        ignore = Props.read_from(args.ignore_keys)["unprocessable"]
+        ignore_dict = Props.read_from(args.ignore_keys)
+        if "unprocessable" not in ignore_dict:
+            msg = f"ignore-keys file {args.ignore_keys} has no 'unprocessable' key"
+            raise KeyError(msg)
+        ignore = ignore_dict["unprocessable"]
     else:
         ignore = []
 
@@ -82,7 +86,6 @@ def build_filedb() -> None:
     except Exception as e:
         msg = f"error when building {args.output} from {args.scan_path}"
         raise RuntimeError(msg) from e
-    fdb.scan_files([args.scan_path])
     fdb.scan_tables_columns(dir_files_conform=True)
 
     # augment dataframe with earliest timestamp found in file
@@ -123,10 +126,9 @@ def build_filedb() -> None:
             if found and args.assume_nonsparse:
                 break
 
-        if (
-            (loc_timestamps == default).all() or not found
-        ) and row.raw_file not in ignore:
-            msg = "something went wrong! no valid first timestamp found. Likely: the file {row.raw_file} is empty"
+        # rows matching an ignore key were already dropped above
+        if (loc_timestamps == default).all() or not found:
+            msg = f"something went wrong! no valid first timestamp found. Likely: the file {row.raw_file} is empty"
             raise RuntimeError(msg)
 
         timestamps[i] = np.min(loc_timestamps)
@@ -134,9 +136,7 @@ def build_filedb() -> None:
         msg = f"found {timestamps[i]}"
         log.info(msg)
 
-        if (
-            timestamps[i] < 0 or timestamps[i] > 4102444800
-        ) and row.raw_file not in ignore:
+        if timestamps[i] < 0 or timestamps[i] > 4102444800:
             msg = f"something went wrong! timestamp {timestamps[i]} does not make sense in {row.raw_file}"
             raise RuntimeError(msg)
 

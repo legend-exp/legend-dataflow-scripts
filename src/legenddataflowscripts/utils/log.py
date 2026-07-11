@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import sys
-import traceback
 from logging.config import dictConfig
 from pathlib import Path
 
@@ -75,7 +74,9 @@ def build_log(
 
     After the logger is created, :data:`sys.stderr` is redirected to it at
     :data:`logging.ERROR` level, and :data:`sys.excepthook` is overridden so
-    that unhandled exceptions are written to the same file handler.
+    that unhandled exceptions are logged as ``ERROR`` records (with the
+    traceback appended by the formatter). :class:`KeyboardInterrupt` is
+    passed through to the default excepthook.
 
     Parameters
     ----------
@@ -129,12 +130,7 @@ def build_log(
             dataflow.setdefault("class", "logging.FileHandler")
             dataflow.setdefault("level", "INFO")
             log_config.setdefault("version", 1)
-            if (
-                "handlers" in log_config
-                and "dataflow" in log_config["handlers"]
-                and "root" not in log_config
-                and "loggers" not in log_config
-            ):
+            if "root" not in log_config and "loggers" not in log_config:
                 dataflow_level = log_config["handlers"]["dataflow"].get("level", "INFO")
                 log_config["root"] = {
                     "level": dataflow_level,
@@ -142,7 +138,7 @@ def build_log(
                 }
 
         dictConfig(log_config)
-        log = logging.getLogger(config_dict["options"].get("logger", "prod"))
+        log = logging.getLogger(config_dict["options"].get("logger", fallback))
 
     else:
         Path(log_file).parent.mkdir(parents=True, exist_ok=True)
@@ -153,17 +149,13 @@ def build_log(
     # Redirect stderr to the logger (using the error level)
     sys.stderr = StreamToLogger(log, logging.ERROR)
 
-    # Extract the stream from the logger's file handler.
-    log_stream = None
-    for handler in log.handlers:
-        if hasattr(handler, "stream"):
-            log_stream = handler.stream
-            break
-    if log_stream is None:
-        log_stream = sys.stdout
-
+    # log uncaught exceptions as ERROR records so the traceback goes through
+    # the formatter (and its severity token) into the configured handlers
     def excepthook(exc_type, exc_value, exc_traceback):
-        traceback.print_exception(exc_type, exc_value, exc_traceback, file=log_stream)
+        if issubclass(exc_type, KeyboardInterrupt):
+            sys.__excepthook__(exc_type, exc_value, exc_traceback)
+            return
+        log.error("uncaught exception", exc_info=(exc_type, exc_value, exc_traceback))
 
     sys.excepthook = excepthook
 
