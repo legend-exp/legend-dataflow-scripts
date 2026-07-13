@@ -824,7 +824,7 @@ def par_geds_hit_ecal() -> None:
 
     db_files = [
         par_file
-        for par_file in args.ctc_dict
+        for par_file in (args.ctc_dict or [])
         if Path(par_file).suffix in (".json", ".yml", ".yaml")
     ]
     if args.ctc_dict and not db_files:
