@@ -81,7 +81,7 @@ def get_rule_config(configs_path, rule_name, timestamp, datatype):
     missing key names the rule, timestamp, datatype and config path instead
     of raising a bare :class:`KeyError`.
     """
-    configs = TextDB(configs_path, lazy=True).on(timestamp, system=datatype)
+    configs = TextDB(configs_path, lazy=True).on(timestamp, category=datatype)
     try:
         return configs["snakemake_rules"][rule_name]
     except KeyError as err:
