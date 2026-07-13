@@ -51,10 +51,10 @@ def build_tier_hit() -> None:
     """
     argparser = argparse.ArgumentParser()
     argparser.add_argument("--input")
-    argparser.add_argument("--pars-file", nargs="*")
+    argparser.add_argument("--pars-file", nargs="*", default=[])
 
     argparser.add_argument("--configs", required=True)
-    argparser.add_argument("--table-map", required=False, type=str)
+    argparser.add_argument("--table-map", required=True, type=str)
     argparser.add_argument("--log")
     argparser.add_argument("--alias-table", help="Alias table", type=str, default=None)
 
@@ -65,7 +65,7 @@ def build_tier_hit() -> None:
     argparser.add_argument("--output")
     args = argparser.parse_args()
 
-    table_map = json.loads(args.table_map) if args.table_map is not None else None
+    table_map = json.loads(args.table_map)
 
     df_config = (
         TextDB(args.configs, lazy=True)
@@ -98,10 +98,9 @@ def build_tier_hit() -> None:
         # get pars (to override hit config)
         hit_cfg = Props.add_to(hit_cfg, pars_dict.get(chan, {}).copy())
 
-        if chan in table_map:
-            input_tbl_name = table_map[chan] if table_map is not None else chan + "/dsp"
-        else:
+        if chan not in table_map:
             continue
+        input_tbl_name = table_map[chan]
 
         # check if the raw tables are all existing
         if len(lh5.ls(args.input, input_tbl_name)) > 0:
@@ -154,7 +153,7 @@ def build_tier_hit_single_channel() -> None:
     """
     argparser = argparse.ArgumentParser()
     argparser.add_argument("--input")
-    argparser.add_argument("--pars-file", nargs="*")
+    argparser.add_argument("--pars-file", nargs="*", default=[])
 
     argparser.add_argument("--configs", required=True)
     argparser.add_argument("--log")
@@ -193,14 +192,11 @@ def build_tier_hit_single_channel() -> None:
         else chan_cfg_map
     )
 
-    # now construct the dictionary of hit configs for build_hit()
-    channel_dict = {}
+    # now construct the hit config for build_hit()
     pars_dict = Props.read_from(args.pars_file)
-    pars_dict = (
-        pars_dict[args.channel]
-        if args.channel is not None and args.channel in pars_dict
-        else pars_dict
-    )
+    # mirror the multi-channel path: channel entries hold the pars under "pars"
+    if args.channel is not None and args.channel in pars_dict:
+        pars_dict = pars_dict[args.channel]["pars"]
 
     hit_cfg = Props.read_from(chan_cfg_map)
     hit_cfg = Props.add_to(hit_cfg, pars_dict.copy())
@@ -208,6 +204,6 @@ def build_tier_hit_single_channel() -> None:
     log.info("running build_hit()...")
     start = time.time()
     Path(args.output).parent.mkdir(parents=True, exist_ok=True)
-    build_hit(args.input, hit_config=channel_dict, outfile=args.output)
+    build_hit(args.input, hit_config=hit_cfg, outfile=args.output)
     msg = f"Hit built in {time.time() - start:.2f} seconds"
     log.info(msg)

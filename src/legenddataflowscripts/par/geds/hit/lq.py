@@ -19,9 +19,12 @@ from pygama.pargen.utils import load_data
 
 from ....utils import (
     build_log,
+    check_pulser_mask,
     convert_dict_np_to_float,
+    expand_filelist,
     fill_plot_dict,
     get_pulser_mask,
+    require_config_keys,
 )
 
 log = logging.getLogger(__name__)
@@ -187,7 +190,14 @@ def run_lq_calibration(
     if isinstance(configs, str | list):
         configs = Props.read_from(configs)
 
+    require_config_keys(configs, ["run_lq"], "lq calibration config")
+
     if configs.pop("run_lq") is True:
+        require_config_keys(
+            configs,
+            ["energy_param", "cal_energy_param", "dt_param", "cut_field"],
+            "lq calibration config",
+        )
         if "plot_options" in configs:
             for field, item in configs["plot_options"].items():
                 configs["plot_options"][field]["function"] = eval(item["function"])
@@ -248,9 +258,13 @@ def run_lq_calibration(
         lq_plot_dict = {}
         lq_obj = None
 
+    # mirror the aoe result shape: one (shared) lq results entry per timestamp
+    if not isinstance(out_dict, dict) or set(out_dict) != set(cal_dicts):
+        out_dict = dict.fromkeys(cal_dicts, out_dict)
+
     out_result_dicts = {}
     for tstamp, result_dict in results_dicts.items():
-        out_result_dicts[tstamp] = dict(**result_dict, lq=out_dict)
+        out_result_dicts[tstamp] = dict(**result_dict, lq=out_dict[tstamp])
 
     out_object_dicts = {}
     for tstamp, object_dict in object_dicts.items():
@@ -358,6 +372,7 @@ def par_geds_hit_lq() -> None:
 
     build_log(args.log_config, args.log)
     kwarg_dict = Props.read_from(args.config_file)
+    require_config_keys(kwarg_dict, ["run_lq"], f"lq config ({args.config_file})")
 
     ecal_dict = Props.read_from(args.ecal_file)
     cal_dict = ecal_dict["pars"]["operations"]
@@ -373,9 +388,12 @@ def par_geds_hit_lq() -> None:
         object_dict = pkl.load(o)
 
     if kwarg_dict["run_lq"] is True:
-        with Path(args.files[0]).open() as f:
-            files = f.read().splitlines()
-        files = sorted(files)
+        require_config_keys(
+            kwarg_dict,
+            ["energy_param", "cal_energy_param", "cut_field", "threshold"],
+            f"lq config ({args.config_file})",
+        )
+        files = expand_filelist(args.files)
 
         params = [
             "lq80",
@@ -405,6 +423,7 @@ def par_geds_hit_lq() -> None:
         else:
             mask = np.zeros(len(threshold_mask), dtype=bool)
 
+        check_pulser_mask(mask, threshold_mask, args.table_name)
         data["is_pulser"] = mask[threshold_mask]
 
         msg = f"{len(data.query('~is_pulser'))}  non pulser events"

@@ -17,7 +17,13 @@ from dbetto.catalog import Props
 from dspeed import build_dsp
 from pygama.pargen.data_cleaning import generate_cuts, get_keys
 
-from ....utils import build_log, get_pulser_mask
+from ....utils import (
+    build_log,
+    check_pulser_mask,
+    expand_filelist,
+    get_pulser_mask,
+    require_config_keys,
+)
 
 warnings.filterwarnings(action="ignore", category=RuntimeWarning)
 
@@ -225,22 +231,20 @@ def par_geds_dsp_evtsel() -> None:
 
     peak_dict = Props.read_from(args.config_file)
     db_dict = Props.read_from(args.decay_const)
+    require_config_keys(
+        peak_dict, ["run_selection"], f"evtsel config ({args.config_file})"
+    )
 
     Path(args.peak_file).parent.mkdir(parents=True, exist_ok=True)
     if peak_dict.pop("run_selection") is True:
         log.debug("Starting peak selection")
+        require_config_keys(
+            peak_dict,
+            ["peaks", "kev_widths", "cut_parameters", "n_events", "final_cut_field"],
+            f"evtsel config ({args.config_file})",
+        )
 
-        if (
-            isinstance(args.raw_filelist, list)
-            and args.raw_filelist[0].split(".")[-1] == "filelist"
-        ):
-            files = args.raw_filelist[0]
-            with Path(files).open() as f:
-                files = f.read().splitlines()
-        else:
-            files = args.raw_filelist
-
-        raw_files = sorted(files)
+        raw_files = expand_filelist(args.raw_filelist, "--raw-filelist")
 
         peaks_kev = peak_dict["peaks"]
         kev_widths = peak_dict["kev_widths"]
@@ -264,9 +268,13 @@ def par_geds_dsp_evtsel() -> None:
         )
 
         if args.no_pulse is False:
+            if args.pulser_file is None:
+                msg = "either --pulser-file or --no-pulse is required"
+                raise ValueError(msg)
             mask = get_pulser_mask(
                 args.pulser_file,
             )
+            check_pulser_mask(mask, tb, args.raw_table_name)
         else:
             mask = np.full(len(tb), False)
 

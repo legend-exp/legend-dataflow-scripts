@@ -162,7 +162,7 @@ isort.required-imports = ["from __future__ import annotations"]
 
 
 [tool.pylint]
-py-version = "3.9"
+py-version = "3.11"
 ignore-paths = [".*/_version.py"]
 reports.output-format = "colorized"
 similarities.ignore-imports = "yes"

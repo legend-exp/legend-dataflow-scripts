@@ -23,8 +23,11 @@ from scipy.stats import binned_statistic
 
 from ....utils import (
     build_log,
+    check_pulser_mask,
     convert_dict_np_to_float,
+    expand_filelist,
     get_pulser_mask,
+    require_config_keys,
 )
 
 mpl.use("agg")
@@ -196,13 +199,13 @@ def plot_pulser_timemap(
 
 
 def get_median(x):
-    if len(x[~np.isnan(x)]) >= 10:
+    if len(x[~np.isnan(x)]) < 10:
         return np.nan
     return np.nanpercentile(x, 50)
 
 
 def get_err(x):
-    if len(x[~np.isnan(x)]) >= 10:
+    if len(x[~np.isnan(x)]) < 10:
         return np.nan
     return np.nanvar(x) / np.sqrt(len(x))
 
@@ -809,6 +812,8 @@ def par_geds_hit_ecal() -> None:
 
     log = build_log(args.log_config, args.log)
 
+    hit_dict = {}
+    in_results_dict = {}
     if args.in_hit_dict:
         hit_dict = Props.read_from(args.in_hit_dict)
         in_results_dict = hit_dict.get("results", {})
@@ -828,6 +833,18 @@ def par_geds_hit_ecal() -> None:
     hit_dict.update(database_dic["ctc_params"])
 
     kwarg_dict = Props.read_from(args.config_file)
+    require_config_keys(
+        kwarg_dict,
+        [
+            "plot_options",
+            "bl_plot_options",
+            "common_plots",
+            "energy_params",
+            "cut_param",
+            "threshold",
+        ],
+        f"ecal config ({args.config_file})",
+    )
 
     # convert plot functions from strings to functions and split off baseline and common plots
     for field, item in kwarg_dict["plot_options"].items():
@@ -838,9 +855,7 @@ def par_geds_hit_ecal() -> None:
         bl_plots[field]["function"] = eval(item["function"])
     common_plots = kwarg_dict.pop("common_plots")
 
-    with Path(args.files[0]).open() as f:
-        files = f.read().splitlines()
-    files = sorted(files)
+    files = expand_filelist(args.files)
 
     # load data in
     data, threshold_mask = load_data(
@@ -865,6 +880,7 @@ def par_geds_hit_ecal() -> None:
     else:
         mask = np.zeros(len(threshold_mask), dtype=bool)
 
+    check_pulser_mask(mask, threshold_mask, args.table_name)
     data["is_pulser"] = mask[threshold_mask]
 
     pk_pars = [
@@ -920,9 +936,13 @@ def par_geds_hit_ecal() -> None:
 
         if kwarg_dict.get("guess_offset", False) is True:
             guess = np.array([0, guess])
-            guess[0] = hit_dict.get(
+            # "guess_offset_param" is a fallback key into hit_dict, not a value
+            offset_cfg = hit_dict.get(
                 "guess_offset_param", "is_valid_cuspEmax_classifier"
-            )["parameters"]["a"]
+            )
+            if isinstance(offset_cfg, str):
+                offset_cfg = hit_dict[offset_cfg]
+            guess[0] = offset_cfg["parameters"]["a"]
 
         full_object_dict[cal_energy_param] = HPGeCalibration(
             energy_param,

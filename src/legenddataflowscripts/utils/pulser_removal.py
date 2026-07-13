@@ -26,7 +26,36 @@ def get_pulser_mask(pulser_file):
     mask = np.array([], dtype=bool)
     for file in pulser_file:
         pulser_dict = Props.read_from(file)
+        if "mask" not in pulser_dict:
+            msg = f"pulser file {file} does not contain a 'mask' key"
+            raise KeyError(msg)
         pulser_mask = np.array(pulser_dict["mask"])
         mask = np.append(mask, pulser_mask)
 
     return mask
+
+
+def check_pulser_mask(mask, threshold_mask, context) -> None:
+    """Validate that the pulser mask matches the loaded events.
+
+    ``mask`` (from the pulser files) must have one entry per event read from
+    the input files, i.e. the same length as the ``threshold_mask``
+    selection returned by ``load_data`` (only ``len()`` is used, so any
+    sized object is accepted).
+
+    Parameters
+    ----------
+    mask
+        Pulser mask array.
+    threshold_mask
+        Event selection mask (or any sized object with one entry per event).
+    context
+        Table/channel name used in the error message.
+    """
+    if len(mask) != len(threshold_mask):
+        msg = (
+            f"pulser mask length {len(mask)} != number of loaded events "
+            f"{len(threshold_mask)} for {context}; the pulser files and "
+            "input filelists likely cover different runs"
+        )
+        raise ValueError(msg)

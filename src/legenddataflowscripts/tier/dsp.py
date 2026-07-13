@@ -107,7 +107,7 @@ def build_tier_dsp() -> None:
     argparser.add_argument(
         "--table-map",
         help="mapping from channel to table name",
-        required=False,
+        required=True,
         type=str,
     )
     argparser.add_argument("--log", help="log file name")
@@ -130,7 +130,7 @@ def build_tier_dsp() -> None:
     # set number of threads to use
     # set_num_threads(1)
 
-    table_map = json.loads(args.table_map) if args.table_map is not None else None
+    table_map = json.loads(args.table_map)
 
     df_configs = TextDB(args.configs, lazy=True)
     config_dict = df_configs.on(args.timestamp, system=args.datatype).snakemake_rules
@@ -152,10 +152,9 @@ def build_tier_dsp() -> None:
     # now construct the dictionary of DSP configs for build_dsp()
     dsp_cfg_tbl_dict = {}
     for chan, file in chan_cfg_map.items():
-        if chan in table_map:
-            input_tbl_name = table_map[chan] if table_map is not None else chan + "/raw"
-        else:
+        if chan not in table_map:
             continue
+        input_tbl_name = table_map[chan]
 
         # check if the raw tables are all existing
         if len(lh5.ls(args.input, input_tbl_name)) > 0:

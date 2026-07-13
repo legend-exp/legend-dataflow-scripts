@@ -20,7 +20,9 @@ from pygama.pargen.utils import load_data
 
 from ....utils import (
     build_log,
+    check_pulser_mask,
     convert_dict_np_to_float,
+    expand_filelist,
     get_pulser_mask,
 )
 
@@ -110,6 +112,11 @@ def build_qc(
         )
 
     if len(fft_files) > 0:
+        if kwarg_dict_fft is None:
+            msg = (
+                "fft files were provided but the qc config has no 'fft_fields' section"
+            )
+            raise ValueError(msg)
         fft_data = load_data(
             fft_files,
             table_name,
@@ -161,12 +168,12 @@ def build_qc(
             for outname, info in cut_dict.items():
                 # convert to pandas eval
                 exp = info["expression"]
-                for key in info.get("parameters", None):
+                for key in info.get("parameters", {}):
                     exp = re.sub(
                         f"(?<![a-zA-Z0-9]){key}(?![a-zA-Z0-9])", f"@{key}", exp
                     )
                 fft_data[outname] = fft_data.eval(
-                    exp, local_dict=info.get("parameters", None)
+                    exp, local_dict=info.get("parameters", {})
                 )
                 if "_classifier" not in outname:
                     ct_mask = ct_mask & fft_data[outname]
@@ -181,8 +188,8 @@ def build_qc(
         plot_dict_fft = {}
         fft_data = None
 
-    if overwrite is not None:
-        for name in kwarg_dict_fft["cut_parameters"]:
+    if overwrite is not None and kwarg_dict_fft is not None:
+        for name in kwarg_dict_fft.get("cut_parameters", {}):
             for cut_name, cut_dict in overwrite.items():
                 if name in cut_name:
                     hit_dict_fft.update({cut_name: cut_dict})
@@ -205,6 +212,7 @@ def build_qc(
     else:
         mask = np.zeros(len(threshold_mask), dtype=bool)
 
+    check_pulser_mask(mask, threshold_mask, table_name)
     data["is_pulser"] = mask[threshold_mask]
 
     msg = f"{len(data.query('~is_pulser'))} non pulser events"
@@ -228,10 +236,9 @@ def build_qc(
     log.info(msg)
 
     rng = np.random.default_rng()
-    mask = np.full(len(data.query("~is_pulser & ~is_recovering")), False, dtype=bool)
-    mask[
-        rng.choice(len(data.query("~is_pulser & ~is_recovering")), 4000, replace=False)
-    ] = True
+    n_clean = len(data.query("~is_pulser & ~is_recovering"))
+    mask = np.full(n_clean, False, dtype=bool)
+    mask[rng.choice(n_clean, min(4000, n_clean), replace=False)] = True
 
     if "initial_cal_cuts" in config:
         init_cal = config["initial_cal_cuts"]
@@ -245,9 +252,9 @@ def build_qc(
         for outname, info in hit_dict_init_cal.items():
             # convert to pandas eval
             exp = info["expression"]
-            for key in info.get("parameters", None):
+            for key in info.get("parameters", {}):
                 exp = re.sub(f"(?<![a-zA-Z0-9]){key}(?![a-zA-Z0-9])", f"@{key}", exp)
-            data[outname] = data.eval(exp, local_dict=info.get("parameters", None))
+            data[outname] = data.eval(exp, local_dict=info.get("parameters", {}))
             if "classifier" not in outname:
                 ct_mask = ct_mask & data[outname]
 
@@ -262,7 +269,7 @@ def build_qc(
         plot_dict_init_cal = {}
 
     if len(data.query("~is_pulser & ~is_recovering")) < 500:
-        log.info("Less than 500 pulser events")
+        log.info("Less than 500 clean events after cuts, using all events")
         cal_data = data.query("~is_pulser & ~is_recovering")
     else:
         cal_data = data.query("~is_pulser & ~is_recovering")[mask]
@@ -286,14 +293,14 @@ def build_qc(
     for outname, info in hit_dict.items():
         # convert to pandas eval
         exp = info["expression"]
-        for key in info.get("parameters", None):
+        for key in info.get("parameters", {}):
             exp = re.sub(f"(?<![a-zA-Z0-9]){key}(?![a-zA-Z0-9])", f"@{key}", exp)
         if fft_data is not None and outname not in fft_data:
             fft_data[outname] = fft_data.eval(
-                exp, local_dict=info.get("parameters", None)
+                exp, local_dict=info.get("parameters", {})
             )
         if outname not in data:
-            data[outname] = data.eval(exp, local_dict=info.get("parameters", None))
+            data[outname] = data.eval(exp, local_dict=info.get("parameters", {}))
 
     qc_results = {}
     for entry in hit_dict:
@@ -427,17 +434,14 @@ def par_geds_hit_qc() -> None:
     else:
         overwrite = None
 
+    # an empty fft filelist is legitimate (no fft runs for this period)
     if len(args.fft_files) == 1 and Path(args.fft_files[0]).suffix == ".filelist":
         with Path(args.fft_files[0]).open() as f:
-            fft_files = f.read().splitlines()
+            fft_files = [line for line in map(str.strip, f) if line]
     else:
         fft_files = args.fft_files
 
-    if len(args.cal_files) == 1 and Path(args.cal_files[0]).suffix == ".filelist":
-        with Path(args.cal_files[0]).open() as f:
-            cal_files = f.read().splitlines()
-    else:
-        cal_files = args.cal_files
+    cal_files = expand_filelist(args.cal_files, "--cal-files")
 
     start = time.time()
     log.info("starting qc")

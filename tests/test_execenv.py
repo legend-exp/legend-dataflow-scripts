@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import sys
 
 import pytest
 from dbetto import AttrsDict
@@ -100,3 +101,19 @@ def test_execenv_pyexe(config):
         "--image=legendexp/legend-base:latest "
         ".snakemake/software/bin/dio-boe "
     )
+
+
+def test_dataflow_no_subcommand(monkeypatch, capsys):
+    monkeypatch.setattr(sys, "argv", ["dataflow", "-v"])
+    with pytest.raises(SystemExit) as excinfo:
+        execenv.dataflow()
+    assert excinfo.value.code == 1
+    assert "usage" in capsys.readouterr().err.lower()
+
+
+def test_select_execenv_missing_system():
+    config = AttrsDict({"execenv": {"bare": {"cmd": "x"}, "lngs": {"cmd": "y"}}})
+    assert execenv._select_execenv(config, "bare", "cfg.yaml") == {"cmd": "x"}
+
+    with pytest.raises(KeyError, match=r"not found under 'execenv' in cfg\.yaml"):
+        execenv._select_execenv(config, "nersc", "cfg.yaml")

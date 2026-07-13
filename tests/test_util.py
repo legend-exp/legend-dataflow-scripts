@@ -7,6 +7,7 @@ import pytest
 import yaml
 
 from legenddataflowscripts.workflow import (
+    as_ro,
     subst_vars,
     subst_vars_impl,
     subst_vars_in_snakemake_config,
@@ -193,3 +194,15 @@ def test_subst_vars_in_snakemake_config(mock_workflow, mock_os_environ):  # noqa
     assert setup["execenv"]["env"] == {"VAR2": "val2"}
     assert setup["execenv"]["cmd"] == "apptainer exec"
     assert setup["execenv"]["arg"] == "prod/container.sif"
+
+
+def test_as_ro():
+    config = {"read_only_fs_sub_pattern": ["^/rw", "/ro"]}
+
+    assert as_ro(config, "/rw/a/b") == "/ro/a/b"
+    # Path inputs must keep their directory components
+    assert as_ro(config, Path("/rw/a/b")) == Path("/ro/a/b")
+    assert as_ro(config, ["/rw/a", "/rw/b"]) == ["/ro/a", "/ro/b"]
+
+    # passthrough when no substitution pattern is configured
+    assert as_ro({}, "/rw/a/b") == "/rw/a/b"

@@ -19,7 +19,7 @@ from pygama.pargen.dsp_optimize import (
     run_bayesian_optimisation,
 )
 
-from ....utils import build_log
+from ....utils import build_log, require_config_keys
 
 warnings.filterwarnings(action="ignore", category=RuntimeWarning)
 try:
@@ -107,7 +107,9 @@ def par_geds_dsp_eopt() -> None:
     argparser.add_argument(
         "--final-dsp-pars", help="final_dsp_pars", type=str, required=True
     )
-    argparser.add_argument("--qbb-grid-path", help="qbb_grid_path", type=str)
+    argparser.add_argument(
+        "--qbb-grid-path", help="qbb_grid_path", type=str, required=True
+    )
     argparser.add_argument("--plot-path", help="plot_path", type=str)
 
     argparser.add_argument(
@@ -122,8 +124,10 @@ def par_geds_dsp_eopt() -> None:
 
     opt_dict = Props.read_from(args.config_file)
     db_dict = Props.read_from(args.decay_const)
+    require_config_keys(opt_dict, ["run_eopt"], f"eopt config ({args.config_file})")
 
-    if opt_dict.pop("run_eopt") is True:
+    run_eopt = opt_dict.pop("run_eopt") is True
+    if run_eopt:
         peaks_kev = np.array(opt_dict["peaks"])
         kev_widths = [tuple(kev_width) for kev_width in opt_dict["kev_widths"]]
 
@@ -431,20 +435,22 @@ def par_geds_dsp_eopt() -> None:
         else:
             plot_dict = {}
 
-        plot_dict["trap_optimisation"] = {
-            "kernel_space": bopt_trap.plot(init_samples=sample_x),
-            "acq_space": bopt_trap.plot_acq(init_samples=sample_x),
-        }
+        # the optimiser plots only exist when the optimisation actually ran
+        if run_eopt:
+            plot_dict["trap_optimisation"] = {
+                "kernel_space": bopt_trap.plot(init_samples=sample_x),
+                "acq_space": bopt_trap.plot_acq(init_samples=sample_x),
+            }
 
-        plot_dict["cusp_optimisation"] = {
-            "kernel_space": bopt_cusp.plot(init_samples=sample_x),
-            "acq_space": bopt_cusp.plot_acq(init_samples=sample_x),
-        }
+            plot_dict["cusp_optimisation"] = {
+                "kernel_space": bopt_cusp.plot(init_samples=sample_x),
+                "acq_space": bopt_cusp.plot_acq(init_samples=sample_x),
+            }
 
-        plot_dict["zac_optimisation"] = {
-            "kernel_space": bopt_zac.plot(init_samples=sample_x),
-            "acq_space": bopt_zac.plot_acq(init_samples=sample_x),
-        }
+            plot_dict["zac_optimisation"] = {
+                "kernel_space": bopt_zac.plot(init_samples=sample_x),
+                "acq_space": bopt_zac.plot_acq(init_samples=sample_x),
+            }
 
         Path(args.plot_path).parent.mkdir(parents=True, exist_ok=True)
         with Path(args.plot_path).open("wb") as w:

@@ -14,8 +14,11 @@ from pygama.pargen.pz_correct import PZCorrect
 
 from ....utils import (
     build_log,
+    check_pulser_mask,
     convert_dict_np_to_float,
+    expand_filelist,
     get_pulser_mask,
+    require_config_keys,
 )
 
 
@@ -99,31 +102,25 @@ def par_geds_dsp_pz() -> None:
 
     log = build_log(args.log_config, args.log)
     kwarg_dict = Props.read_from(args.config_file)
+    require_config_keys(kwarg_dict, ["run_tau"], f"pz config ({args.config_file})")
 
     if kwarg_dict["run_tau"] is True:
+        require_config_keys(
+            kwarg_dict, ["threshold"], f"pz config ({args.config_file})"
+        )
         dsp_config = Props.read_from(args.processing_chain)
         kwarg_dict.pop("run_tau")
+        # prefer dedicated pz files when given; an empty pz filelist falls
+        # back to the raw files
         input_file = []
-        if args.pz_files is not None and len(args.pz_files) > 0:
-            if (
-                isinstance(args.pz_files, list)
-                and args.pz_files[0].split(".")[-1] == "filelist"
-            ):
-                input_file = args.pz_files[0]
-                with Path(input_file).open() as f:
-                    input_file = f.read().splitlines()
+        if args.pz_files:
+            if len(args.pz_files) == 1 and Path(args.pz_files[0]).suffix == ".filelist":
+                with Path(args.pz_files[0]).open() as f:
+                    input_file = [line for line in map(str.strip, f) if line]
             else:
                 input_file = args.pz_files
         if len(input_file) == 0:
-            if (
-                isinstance(args.raw_files, list)
-                and args.raw_files[0].split(".")[-1] == "filelist"
-            ):
-                input_file = args.raw_files[0]
-                with Path(input_file).open() as f:
-                    input_file = f.read().splitlines()
-            else:
-                input_file = args.raw_files
+            input_file = expand_filelist(args.raw_files, "--raw-files")
 
         msg = f"Reading Data for {args.raw_table_name} from:"
         log.debug(msg)
@@ -139,7 +136,11 @@ def par_geds_dsp_pz() -> None:
         if args.no_pulse is False and (
             args.pz_files is None or len(args.pz_files) == 0
         ):
+            if args.pulser_file is None:
+                msg = "either --pulser-file or --no-pulse is required"
+                raise ValueError(msg)
             mask = get_pulser_mask(args.pulser_file)
+            check_pulser_mask(mask, data, args.raw_table_name)
         else:
             mask = np.full(len(data), False)
 

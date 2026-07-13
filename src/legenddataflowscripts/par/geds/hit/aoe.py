@@ -17,9 +17,12 @@ from pygama.pargen.utils import load_data
 
 from ....utils import (
     build_log,
+    check_pulser_mask,
     convert_dict_np_to_float,
+    expand_filelist,
     fill_plot_dict,
     get_pulser_mask,
+    require_config_keys,
 )
 
 log = logging.getLogger(__name__)
@@ -338,6 +341,7 @@ def par_geds_hit_aoe() -> None:
 
     log = build_log(args.log_config, args.log)
     kwarg_dict = Props.read_from(args.config_file)
+    require_config_keys(kwarg_dict, ["run_aoe"], f"aoe config ({args.config_file})")
 
     ecal_dict = Props.read_from(args.ecal_file)
     cal_dict = ecal_dict["pars"]
@@ -352,10 +356,14 @@ def par_geds_hit_aoe() -> None:
     else:
         out_plot_dict = {}
 
-    with Path(args.files[0]).open() as f:
-        files = sorted(f.read().splitlines())
+    files = expand_filelist(args.files)
 
     if kwarg_dict["run_aoe"] is True:
+        require_config_keys(
+            kwarg_dict,
+            ["current_param", "energy_param", "cal_energy_param", "cut_field"],
+            f"aoe config ({args.config_file})",
+        )
         params = [
             kwarg_dict["current_param"],
             "tp_0_est",
@@ -393,17 +401,15 @@ def par_geds_hit_aoe() -> None:
         else:
             mask = np.zeros(len(threshold_mask), dtype=bool)
 
+        check_pulser_mask(mask, threshold_mask, args.table_name)
         data["is_pulser"] = mask[threshold_mask]
 
         msg = f"{len(data.query('~is_pulser'))}  non pulser events"
         log.info(msg)
 
-        with Path(args.files[0]).open() as f:
-            files = f.read().splitlines()
-        files = sorted(files)
-
         data["run_timestamp"] = args.timestamp
 
+        override_dict = None
         if args.override_files:
             override_dict = Props.read_from(args.override_files)
             override_dict = override_dict.get(args.detector, None)

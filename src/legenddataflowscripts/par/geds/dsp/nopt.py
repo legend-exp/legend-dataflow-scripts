@@ -12,7 +12,7 @@ from dbetto.catalog import Props
 from dspeed import build_dsp
 from pygama.pargen.data_cleaning import generate_cuts, get_cut_indexes
 
-from ....utils import build_log
+from ....utils import build_log, require_config_keys
 
 
 def par_geds_dsp_nopt() -> None:
@@ -91,6 +91,7 @@ def par_geds_dsp_nopt() -> None:
 
     opt_dict = Props.read_from(args.config_file)
     db_dict = Props.read_from(args.database)
+    require_config_keys(opt_dict, ["run_nopt"], f"nopt config ({args.config_file})")
 
     if opt_dict.pop("run_nopt") is True:
         with Path(args.raw_filelist).open() as f:
@@ -162,4 +163,4 @@ def par_geds_dsp_nopt() -> None:
             pkl.dump(plot_dict, f, protocol=pkl.HIGHEST_PROTOCOL)
 
     Path(args.dsp_pars).parent.mkdir(parents=True, exist_ok=True)
-    Props.write_to(args.dsp_pars, dict(nopt_pars=out_dict, **db_dict))
+    Props.write_to(args.dsp_pars, {**db_dict, "nopt_pars": out_dict})
