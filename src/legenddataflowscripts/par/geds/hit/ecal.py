@@ -937,7 +937,9 @@ def par_geds_hit_ecal() -> None:
         if kwarg_dict.get("guess_offset", False) is True:
             guess = np.array([0, guess])
             # "guess_offset_param" is a fallback key into hit_dict, not a value
-            offset_cfg = hit_dict.get("guess_offset_param", "is_valid_cuspEmax_classifier")
+            offset_cfg = hit_dict.get(
+                "guess_offset_param", "is_valid_cuspEmax_classifier"
+            )
             if isinstance(offset_cfg, str):
                 offset_cfg = hit_dict[offset_cfg]
             guess[0] = offset_cfg["parameters"]["a"]
