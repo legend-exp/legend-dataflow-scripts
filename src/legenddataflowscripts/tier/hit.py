@@ -1,16 +1,20 @@
 from __future__ import annotations
 
 import argparse
-import json
 import time
-from pathlib import Path
 
 import lh5
-from dbetto import TextDB
 from dbetto.catalog import Props
 from pygama.hit.build_hit import build_hit
 
-from ..utils import alias_table, build_log
+from ..utils import (
+    alias_table,
+    build_log,
+    check_input_files,
+    get_rule_config,
+    parse_json_arg,
+    prepare_output_paths,
+)
 
 
 def build_tier_hit() -> None:
@@ -65,15 +69,20 @@ def build_tier_hit() -> None:
     argparser.add_argument("--output")
     args = argparser.parse_args()
 
-    table_map = json.loads(args.table_map)
-
-    df_config = (
-        TextDB(args.configs, lazy=True)
-        .on(args.timestamp, system=args.datatype)
-        .snakemake_rules[f"tier_{args.tier}"]
+    df_config = get_rule_config(
+        args.configs, f"tier_{args.tier}", args.timestamp, args.datatype
     )
     log = build_log(df_config, args.log, fallback=__name__)
     log.info("initializing")
+
+    table_map = parse_json_arg(args.table_map, "--table-map")
+    alias_map = (
+        parse_json_arg(args.alias_table, "--alias-table")
+        if args.alias_table is not None
+        else None
+    )
+    check_input_files(args.input, "--input")
+    prepare_output_paths(args.output)
 
     settings_dict = df_config.options.get("settings", {})
 
@@ -111,13 +120,12 @@ def build_tier_hit() -> None:
 
     log.info("running build_hit()...")
     start = time.time()
-    Path(args.output).parent.mkdir(parents=True, exist_ok=True)
     build_hit(args.input, lh5_tables_config=channel_dict, outfile=args.output)
     msg = f"Hit built in {time.time() - start:.2f} seconds"
     log.info(msg)
-    if args.alias_table is not None:
+    if alias_map is not None:
         log.info("Creating alias table")
-        alias_table(args.output, args.alias_table)
+        alias_table(args.output, alias_map)
 
 
 def build_tier_hit_single_channel() -> None:
@@ -171,13 +179,14 @@ def build_tier_hit_single_channel() -> None:
     argparser.add_argument("--output")
     args = argparser.parse_args()
 
-    df_config = (
-        TextDB(args.configs, lazy=True)
-        .on(args.timestamp, system=args.datatype)
-        .snakemake_rules[f"tier_{args.tier}"]
+    df_config = get_rule_config(
+        args.configs, f"tier_{args.tier}", args.timestamp, args.datatype
     )
     log = build_log(df_config, args.log, fallback=__name__)
     log.info("initializing")
+
+    check_input_files(args.input, "--input")
+    prepare_output_paths(args.output)
 
     settings_dict = df_config.options.get("settings", {})
 
@@ -203,7 +212,6 @@ def build_tier_hit_single_channel() -> None:
 
     log.info("running build_hit()...")
     start = time.time()
-    Path(args.output).parent.mkdir(parents=True, exist_ok=True)
     build_hit(args.input, hit_config=hit_cfg, outfile=args.output)
     msg = f"Hit built in {time.time() - start:.2f} seconds"
     log.info(msg)

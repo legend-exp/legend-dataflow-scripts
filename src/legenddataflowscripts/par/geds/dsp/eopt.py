@@ -19,7 +19,12 @@ from pygama.pargen.dsp_optimize import (
     run_bayesian_optimisation,
 )
 
-from ....utils import build_log, require_config_keys
+from ....utils import (
+    build_log,
+    check_input_files,
+    prepare_output_paths,
+    require_config_keys,
+)
 
 warnings.filterwarnings(action="ignore", category=RuntimeWarning)
 try:
@@ -117,8 +122,13 @@ def par_geds_dsp_eopt() -> None:
     )
     args = argparser.parse_args()
 
-    dsp_config = Props.read_from(args.processing_chain)
     log = build_log(args.log_config, args.log)
+
+    check_input_files(args.peak_file, "--peak-file")
+    check_input_files(args.inplots, "--inplots")
+    prepare_output_paths(args.qbb_grid_path, args.final_dsp_pars, args.plot_path)
+
+    dsp_config = Props.read_from(args.processing_chain)
 
     t0 = time.time()
 
@@ -418,14 +428,12 @@ def par_geds_dsp_eopt() -> None:
         else:
             db_dict.update({"ctc_params": out_alpha_dict})
 
-        Path(args.qbb_grid_path).parent.mkdir(parents=True, exist_ok=True)
         with Path(args.qbb_grid_path).open("wb") as f:
             pkl.dump({"eopt": optimisers}, f, protocol=pkl.HIGHEST_PROTOCOL)
 
     else:
         Path(args.qbb_grid_path).touch()
 
-    Path(args.final_dsp_pars).parent.mkdir(parents=True, exist_ok=True)
     Props.write_to(args.final_dsp_pars, db_dict)
 
     if args.plot_path:
@@ -452,6 +460,5 @@ def par_geds_dsp_eopt() -> None:
                 "acq_space": bopt_zac.plot_acq(init_samples=sample_x),
             }
 
-        Path(args.plot_path).parent.mkdir(parents=True, exist_ok=True)
         with Path(args.plot_path).open("wb") as w:
             pkl.dump(plot_dict, w, protocol=pkl.HIGHEST_PROTOCOL)

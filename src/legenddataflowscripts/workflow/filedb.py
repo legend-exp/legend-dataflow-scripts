@@ -9,6 +9,8 @@ import numpy as np
 from dbetto.catalog import Props
 from pygama.flow.file_db import FileDB
 
+from ..utils import prepare_output_paths
+
 
 def build_filedb() -> None:
     """Build a :class:`pygama.flow.file_db.FileDB` from a directory scan.
@@ -55,8 +57,6 @@ def build_filedb() -> None:
     argparser.add_argument("--assume-nonsparse", action="store_true")
     args = argparser.parse_args()
 
-    config = Props.read_from(args.config)
-
     if args.log is not None:
         Path(args.log).parent.mkdir(parents=True, exist_ok=True)
         logging.basicConfig(level=logging.DEBUG, filename=args.log, filemode="w")
@@ -70,6 +70,10 @@ def build_filedb() -> None:
     logging.getLogger("h5py._conv").setLevel(logging.INFO)
 
     log = logging.getLogger(__name__)
+
+    prepare_output_paths(args.output)
+
+    config = Props.read_from(args.config)
 
     if args.ignore_keys is not None:
         ignore_dict = Props.read_from(args.ignore_keys)

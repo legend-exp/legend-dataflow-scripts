@@ -21,6 +21,7 @@ from ....utils import (
     build_log,
     check_pulser_mask,
     expand_filelist,
+    get_channel_config,
     get_pulser_mask,
     require_config_keys,
 )
@@ -292,9 +293,11 @@ def par_geds_dsp_evtsel() -> None:
             )
 
         if args.raw_cal_curve:
-            raw_dict = Props.read_from(args.raw_cal_curve)[args.channel]["pars"][
-                "operations"
-            ]
+            raw_dict = get_channel_config(
+                Props.read_from(args.raw_cal_curve),
+                args.channel,
+                name="--raw-cal-curve",
+            )["pars"]["operations"]
         else:
             E_uncal = tb[energy_field].nda
             E_uncal = E_uncal[E_uncal > 200]

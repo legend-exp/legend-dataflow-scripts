@@ -13,11 +13,14 @@ import yaml
 from legenddataflowscripts.utils import (
     alias_table,
     build_log,
+    check_input_files,
     check_pulser_mask,
     expand_filelist,
     get_channel_config,
     get_pulser_mask,
     get_rule_config,
+    parse_json_arg,
+    prepare_output_paths,
     require_config_keys,
 )
 
@@ -46,13 +49,65 @@ def test_require_config_keys():
 
 
 def test_expand_filelist_plain_files():
-    assert expand_filelist(["b.lh5", "a.lh5", "b.lh5"]) == ["a.lh5", "b.lh5"]
+    assert expand_filelist(["b.lh5", "a.lh5", "b.lh5"], check_exists=False) == [
+        "a.lh5",
+        "b.lh5",
+    ]
 
 
 def test_expand_filelist_from_filelist(tmp_path):
+    for name in ("a.lh5", "b.lh5"):
+        (tmp_path / name).touch()
     filelist = tmp_path / "cal.filelist"
-    filelist.write_text("b.lh5\n\na.lh5\n  \nb.lh5\n")
-    assert expand_filelist([str(filelist)]) == ["a.lh5", "b.lh5"]
+    filelist.write_text(f"{tmp_path}/b.lh5\n\n{tmp_path}/a.lh5\n  \n{tmp_path}/b.lh5\n")
+    assert expand_filelist([str(filelist)]) == [
+        f"{tmp_path}/a.lh5",
+        f"{tmp_path}/b.lh5",
+    ]
+
+
+def test_expand_filelist_missing_members(tmp_path):
+    filelist = tmp_path / "cal.filelist"
+    filelist.write_text("missing1.lh5\nmissing2.lh5\n")
+    with pytest.raises(FileNotFoundError, match="--files: input file"):
+        expand_filelist([str(filelist)])
+
+
+def test_check_input_files(tmp_path):
+    existing = tmp_path / "in.lh5"
+    existing.touch()
+
+    check_input_files(None)
+    check_input_files(str(existing), "--input")
+    check_input_files([str(existing)], "--input")
+
+    with pytest.raises(FileNotFoundError, match="--input: input file"):
+        check_input_files(str(tmp_path / "gone.lh5"), "--input")
+
+    # all missing files are aggregated, truncated after five
+    missing = [str(tmp_path / f"m{i}.lh5") for i in range(7)]
+    with pytest.raises(FileNotFoundError, match=r"\(and 2 more\)"):
+        check_input_files(missing, "--files")
+
+
+def test_prepare_output_paths(tmp_path):
+    out1 = tmp_path / "a" / "b" / "out.yaml"
+    out2 = tmp_path / "c" / "out.pkl"
+    prepare_output_paths(str(out1), None, str(out2))
+    assert out1.parent.is_dir()
+    assert out2.parent.is_dir()
+
+
+def test_parse_json_arg():
+    assert parse_json_arg('{"ch1": "ch1/raw"}', "--table-map") == {"ch1": "ch1/raw"}
+
+    with pytest.raises(ValueError, match="--table-map is not valid JSON"):
+        parse_json_arg("{not json}", "--table-map")
+
+
+def test_get_rule_config_missing_dir(tmp_path):
+    with pytest.raises(FileNotFoundError, match="config directory"):
+        get_rule_config(tmp_path / "nope", "tier_dsp", "20230101T000000Z", "cal")
 
 
 def test_expand_filelist_empty_args():

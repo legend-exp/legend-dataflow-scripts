@@ -24,6 +24,7 @@ from ....utils import (
     convert_dict_np_to_float,
     expand_filelist,
     get_pulser_mask,
+    prepare_output_paths,
 )
 
 log = logging.getLogger(__name__)
@@ -420,7 +421,9 @@ def par_geds_hit_qc() -> None:
     argparser.add_argument("--save-path", help="save_path", type=str)
     args = argparser.parse_args()
 
-    build_log(args.log_config, args.log)
+    log = build_log(args.log_config, args.log)
+
+    prepare_output_paths(args.save_path, args.plot_path)
 
     # get metadata dictionary
     kwarg_dict = Props.read_from(args.config_file)
@@ -458,10 +461,8 @@ def par_geds_hit_qc() -> None:
     msg = f"qc took {time.time() - start:.2f} seconds"
     log.info(msg)
 
-    Path(args.save_path).parent.mkdir(parents=True, exist_ok=True)
     Props.write_to(args.save_path, out_dict)
 
     if args.plot_path:
-        Path(args.plot_path).parent.mkdir(parents=True, exist_ok=True)
         with Path(args.plot_path).open("wb") as f:
             pkl.dump({"qc": plot_dict}, f, protocol=pkl.HIGHEST_PROTOCOL)
