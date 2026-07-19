@@ -221,7 +221,10 @@ def build_qc(
     msg = f"{len(data.query('is_recovering'))} discharge recovery events"
     log.info(msg)
 
-    rng = np.random.default_rng()
+    # fixed seed: the qc cut values must be reproducible between runs of the
+    # same data (an unseeded generator made the 4000-event cut-derivation
+    # sample — and thus the derived cut boundaries — vary run to run)
+    rng = np.random.default_rng(1)
     n_clean = len(data.query("~is_pulser & ~is_recovering"))
     mask = np.full(n_clean, False, dtype=bool)
     mask[rng.choice(n_clean, min(4000, n_clean), replace=False)] = True
