@@ -148,7 +148,9 @@ def par_geds_dsp_eopt() -> None:
         kwarg_dicts_cusp = []
         kwarg_dicts_trap = []
         kwarg_dicts_zac = []
-        for peak, kev_width in zip(peaks_kev, kev_widths, strict=False):
+        # strict: a length mismatch between the peaks and kev_widths config
+        # lists is a config error and must not silently drop peaks
+        for peak, kev_width in zip(peaks_kev, kev_widths, strict=True):
             kwarg_dicts_cusp.append(
                 {
                     "parameter": "cuspEmax",

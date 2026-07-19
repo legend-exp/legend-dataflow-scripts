@@ -190,9 +190,12 @@ def par_geds_dsp_pz() -> None:
             # (row-identical: the read idx was cuts[:2*n_events][idxs] with
             # the first n_events kept, both in ascending row order)
             del tb_out
-            tb_data = take_table_rows(
-                tb_data, np.where(idxs)[0][: kwarg_dict.pop("n_events")]
-            )
+            sel = np.asarray(idxs)
+            # get_cut_indexes returns a boolean mask; also accept an index
+            # array in case that ever changes
+            if sel.dtype == np.bool_:
+                sel = np.flatnonzero(sel)
+            tb_data = take_table_rows(tb_data, sel[: kwarg_dict.pop("n_events")])
 
         tau = PZCorrect(
             dsp_config,
