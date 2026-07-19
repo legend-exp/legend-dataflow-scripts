@@ -22,6 +22,7 @@ from ....utils import (
     check_pulser_mask,
     expand_filelist,
     get_channel_config,
+    get_is_recovering_mask,
     get_pulser_mask,
     require_config_keys,
 )
@@ -126,10 +127,10 @@ def get_out_data(
             "trapTmax_cal": lgdo.Array(
                 dsp_data["trapTmax"].nda[final_mask] * ecal_pars
             ),
-            "peak": lgdo.Array(np.full(len(np.where(final_mask)[0]), int(peak))),
+            "peak": lgdo.Array(np.full(int(np.count_nonzero(final_mask)), int(peak))),
         }
     )
-    return out_tbl, len(np.where(final_mask)[0])
+    return out_tbl, int(np.count_nonzero(final_mask))
 
 
 def par_geds_dsp_evtsel() -> None:
@@ -281,16 +282,9 @@ def par_geds_dsp_evtsel() -> None:
 
         discharges = tb["t_sat_lo"].nda > 0
         discharge_timestamps = np.where(tb["timestamp"].nda[discharges])[0]
-        is_recovering = np.full(len(tb), False, dtype=bool)
-        for tstamp in discharge_timestamps:
-            is_recovering = is_recovering | np.where(
-                (
-                    ((tb["timestamp"].nda - tstamp) < 0.01)
-                    & ((tb["timestamp"].nda - tstamp) > 0)
-                ),
-                True,
-                False,
-            )
+        is_recovering = get_is_recovering_mask(
+            tb["timestamp"].nda, discharge_timestamps
+        )
 
         if args.raw_cal_curve:
             raw_dict = get_channel_config(
@@ -342,6 +336,10 @@ def par_geds_dsp_evtsel() -> None:
         input_data = lh5.read(
             f"{lh5_path}", raw_files, n_rows=10000, idx=np.where(~mask)[0]
         )
+        # the all-events scalar table and its derived masks are no longer
+        # needed; free them before the per-peak waveform buffers accumulate
+        del tb, rough_energy, e_mask, mask, is_recovering, discharges
+        del discharge_timestamps
 
         if isinstance(dsp_config, str):
             dsp_config = Props.read_from(dsp_config)
@@ -360,6 +358,10 @@ def par_geds_dsp_evtsel() -> None:
             log.debug(msg)
         else:
             cut_dict = None
+        # free the cut-derivation waveform buffer and its DSP output — they
+        # would otherwise stay resident alongside every per-peak obj_buf for
+        # the whole file x peak loop below
+        del input_data, tb_data
 
         pk_dicts = {}
         for peak, kev_width in zip(peaks_kev, kev_widths, strict=False):
@@ -373,10 +375,10 @@ def par_geds_dsp_evtsel() -> None:
 
         for file in raw_files:
             log.debug(Path(file).name)
+            # idx is a long continuous array
+            n_rows_i = sto.read_n_rows(lh5_path, file)
             for peak, peak_dict in pk_dicts.items():
                 if peak_dict["idxs"] is not None:
-                    # idx is a long continuous array
-                    n_rows_i = sto.read_n_rows(lh5_path, file)
                     # find the length of the subset of idx that contains indices
                     # that are less than n_rows_i
                     n_rows_to_read_i = bisect_left(peak_dict["idxs"][0], n_rows_i)
