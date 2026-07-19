@@ -69,7 +69,11 @@ def par_geds_dsp_eopt() -> None:
         Energy optimisation configuration file(s).  Must contain ``run_eopt``
         (bool), ``peaks`` (list of keV values), ``kev_widths``, ``fom``,
         ``fom_field``, ``fom_err_field``, ``initial_samples``, ``acq_func``,
-        ``batch_size``, and ``n_iter``.
+        ``batch_size``, and ``n_iter``.  Optional: ``use_log_pdf`` (bool,
+        default false) builds the FOM's unbinned fits from the model's
+        log-density (iminuit ``log=True``) — substantially faster, results
+        differ at machine-precision level; requires a pygama version with
+        ``use_log_pdf`` support.
     ``--log-config`` : str, optional
         Logging configuration file.
     ``--raw-table-name`` : str
@@ -144,10 +148,7 @@ def par_geds_dsp_eopt() -> None:
         kwarg_dicts_cusp = []
         kwarg_dicts_trap = []
         kwarg_dicts_zac = []
-        for peak in peaks_kev:
-            peak_idx = np.where(peaks_kev == peak)[0][0]
-            kev_width = kev_widths[peak_idx]
-
+        for peak, kev_width in zip(peaks_kev, kev_widths, strict=False):
             kwarg_dicts_cusp.append(
                 {
                     "parameter": "cuspEmax",
@@ -205,10 +206,20 @@ def par_geds_dsp_eopt() -> None:
         db_dict["etrap"] = {"flat": flat_val}
 
         tb_data.add_column("dt_eff", init_data["dt_eff"])
+        # add_column stores the Array object itself, so dt_eff survives freeing
+        # the rest of the init DSP output (otherwise held for the whole
+        # optimisation)
+        del init_data, full_dt
 
         dsp_config["processors"].pop("dt_eff")
 
         dsp_config["outputs"] = ["zacEmax", "cuspEmax", "trapEmax", "dt_eff"]
+
+        # opt-in: build the unbinned NLL fits from the model's log-density
+        # (iminuit log=True mode) — much faster on large samples, results
+        # differ at machine-precision level. Requires pygama with
+        # use_log_pdf support; older versions silently ignore the key.
+        use_log_pdf = opt_dict.get("use_log_pdf", False)
 
         kwarg_dict = [
             {
@@ -216,18 +227,21 @@ def par_geds_dsp_eopt() -> None:
                 "ctc_param": "dt_eff",
                 "idx_list": idx_list,
                 "peaks_kev": peaks_kev,
+                "use_log_pdf": use_log_pdf,
             },
             {
                 "peak_dicts": kwarg_dicts_zac,
                 "ctc_param": "dt_eff",
                 "idx_list": idx_list,
                 "peaks_kev": peaks_kev,
+                "use_log_pdf": use_log_pdf,
             },
             {
                 "peak_dicts": kwarg_dicts_trap,
                 "ctc_param": "dt_eff",
                 "idx_list": idx_list,
                 "peaks_kev": peaks_kev,
+                "use_log_pdf": use_log_pdf,
             },
         ]
 
