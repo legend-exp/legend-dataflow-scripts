@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+import inspect
 import pickle as pkl
 import warnings
 from datetime import datetime
@@ -758,7 +759,11 @@ def par_geds_hit_ecal() -> None:
     ``--log-config`` : str, optional
         Logging configuration file.
     ``--config-file`` : list of str
-        Energy calibration configuration file(s).
+        Energy calibration configuration file(s).  Optional key
+        ``use_log_pdf`` (bool, default false): build the unbinned peak fits
+        from the model's log-density (iminuit ``log=True``) — substantially
+        faster, results differ at machine-precision level; requires a pygama
+        version with ``use_log_pdf`` support (silently ignored otherwise).
     ``--det-status`` : str
         Detector status (``"on"`` or other); affects peak-finding tolerances.
         Defaults to ``"on"``.
@@ -919,6 +924,20 @@ def par_geds_hit_ecal() -> None:
 
     selection_string = f"~is_pulser&{kwarg_dict['cut_param']}"
 
+    # opt-in: build the unbinned peak fits from the model's log-density
+    # (iminuit log=True mode) — much faster on large samples, results differ
+    # at machine-precision level. Needs a pygama version with use_log_pdf
+    # support; fall back silently on older versions.
+    use_log_pdf = kwarg_dict.get("use_log_pdf", False)
+    if (
+        use_log_pdf
+        and "use_log_pdf"
+        not in inspect.signature(HPGeCalibration.hpge_fit_energy_peaks).parameters
+    ):
+        log.warning("installed pygama does not support use_log_pdf, ignoring")
+        use_log_pdf = False
+    fit_kwargs = {"use_log_pdf": True} if use_log_pdf else {}
+
     results_dict = {}
     plot_dict = {}
     full_object_dict = {}
@@ -996,6 +1015,7 @@ def par_geds_hit_ecal() -> None:
             allowed_p_val=kwarg_dict.get("p_val", 0),
             update_cal_pars=bool(args.det_status == "on"),
             bin_width_kev=0.5,
+            **fit_kwargs,
         )
         full_object_dict[cal_energy_param].hpge_fit_energy_peaks(
             e_uncal,
@@ -1006,6 +1026,7 @@ def par_geds_hit_ecal() -> None:
             allowed_p_val=kwarg_dict.get("p_val", 0),
             update_cal_pars=kwarg_dict.get("use_all_peaks", False),
             bin_width_kev=0.5,
+            **fit_kwargs,
         )
 
         full_object_dict[cal_energy_param].get_energy_res_curve(
