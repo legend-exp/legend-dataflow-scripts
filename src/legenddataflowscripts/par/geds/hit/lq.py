@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+import inspect
 import logging
 import pickle as pkl
 import time
@@ -68,6 +69,7 @@ def lq_calibration(
     selection_string: str = "",
     plot_options: dict | None = None,
     debug_mode: bool = False,
+    use_log_pdf: bool = False,
 ):
     """Calibrate the LQ (late-charge) pulse-shape discriminant.
 
@@ -102,6 +104,11 @@ def lq_calibration(
         passed to :func:`~legenddataflowscripts.utils.fill_plot_dict`.
     debug_mode : bool
         Activates additional diagnostic output.  Defaults to ``False``.
+    use_log_pdf : bool
+        Build the survival-fraction unbinned NLL fits from the models'
+        log-densities (iminuit ``log=True`` mode) — faster, results differ
+        at machine-precision level.  Silently ignored when the installed
+        pygama does not support it.
 
     Returns
     -------
@@ -115,6 +122,10 @@ def lq_calibration(
         Calibrated LQ object.
     """
 
+    if use_log_pdf and "use_log_pdf" not in inspect.signature(LQCal).parameters:
+        log.warning("installed pygama does not support use_log_pdf, ignoring")
+        use_log_pdf = False
+
     lq = LQCal(
         cal_dicts,
         cal_energy_param,
@@ -123,6 +134,7 @@ def lq_calibration(
         cdf,
         selection_string,
         debug_mode=debug_mode,
+        **({"use_log_pdf": True} if use_log_pdf else {}),
     )
 
     data["LQ_Ecorr"] = np.divide(data["lq80"], data[energy_param])
@@ -173,7 +185,11 @@ def run_lq_calibration(
     configs : dict or str or list
         LQ calibration configuration.  Must contain ``run_lq`` (bool),
         ``energy_param``, ``cal_energy_param``, ``cut_field``, and
-        ``dt_param``.
+        ``dt_param``.  Optional key ``use_log_pdf`` (bool, default false):
+        build the survival-fraction unbinned fits from the models'
+        log-densities (iminuit ``log=True``) — substantially faster, results
+        differ at machine-precision level; requires a pygama version with
+        ``use_log_pdf`` support (silently ignored otherwise).
     debug_mode : bool
         Activates additional diagnostic output.  Defaults to ``False``.
 
@@ -244,6 +260,7 @@ def run_lq_calibration(
             selection_string=f"{configs.pop('cut_field')}&(~is_pulser)",
             plot_options=configs.get("plot_options", None),
             debug_mode=debug_mode | configs.get("debug_mode", False),
+            use_log_pdf=configs.get("use_log_pdf", False),
         )
         msg = f"lq calibration took {time.time() - start:.2f} seconds"
         log.info(msg)
