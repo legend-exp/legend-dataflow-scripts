@@ -103,8 +103,13 @@ def run_aoe_calibration(
         ``{timestamp: plot_dict}`` mapping of existing plot dictionaries.
     config : dict or str or list
         A/E calibration configuration.  Must contain ``run_aoe`` (bool),
-        ``current_param``, ``energy_param``, ``cal_energy_param``,
-        ``cut_field``, and ``threshold``.
+        ``cal_energy_param``, ``cut_field``, and ``params`` — a mapping of
+        ``{name: param_config}`` with one entry per A/E parameter to
+        calibrate.  Each *param_config* must contain ``current_param`` and
+        ``energy_param``; optional keys are ``dt_param``, ``dt_corr``,
+        ``dep_correct``, ``dt_cut``, ``pdf``, ``mean_func``, ``sigma_func``,
+        ``high_cut_val``, ``suffix`` (appended to the output parameter names
+        so entries don't collide), and ``plot_options``.
     debug_mode : bool
         Activates additional diagnostic output in :class:`~pygama.pargen.AoE_cal.CalAoE`.
         Defaults to ``False``.
@@ -179,11 +184,8 @@ def run_aoe_calibration(
                     exp, local_dict=cut_dict[next(iter(cut_dict))]["parameters"]
                 )
 
-            initial_param = (
-                "AoE_uncorr"
-                if param_config.get("suffix", None) is None
-                else f"AoE_Uncorr_{param_config['suffix']}"
-            )
+            suffix = param_config.get("suffix", None)
+            initial_param = "AoE_Uncorr" if suffix is None else f"AoE_Uncorr_{suffix}"
             data[initial_param] = (
                 data[param_config["current_param"]] / data[param_config["energy_param"]]
             )
@@ -219,7 +221,7 @@ def run_aoe_calibration(
                 data,
                 initial_param,
                 override_dict=override_dict,
-                suffix=param_config.get("suffix", None),
+                **({} if suffix is None else {"suffix": suffix}),
             )
 
             msg = f"A/E calibration completed in {time.time() - start:.2f} seconds"
@@ -386,7 +388,7 @@ def par_geds_hit_aoe() -> None:
     if kwarg_dict["run_aoe"] is True:
         require_config_keys(
             kwarg_dict,
-            ["current_param", "energy_param", "cal_energy_param", "cut_field"],
+            ["cal_energy_param", "cut_field", "threshold", "params"],
             f"aoe config ({args.config_file})",
         )
         params = [
