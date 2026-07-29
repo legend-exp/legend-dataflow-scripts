@@ -104,51 +104,52 @@ def run_aoe_calibration(
         ``{timestamp: plot_dict}`` mapping of existing plot dictionaries.
     config : dict or str or list
         A/E calibration configuration.  Must contain ``run_aoe`` (bool),
-        ``current_param``, ``energy_param``, ``cal_energy_param``,
-        ``cut_field``, and ``threshold``.  Optional key ``use_log_pdf``
-        (bool, default false): build the unbinned A/E and survival-fraction
-        fits from the models' log-densities (iminuit ``log=True``) —
-        substantially faster, results differ at machine-precision level;
-        requires a pygama version with ``use_log_pdf`` support (silently
-        ignored otherwise).
+        ``cal_energy_param``, ``cut_field``, and ``params`` — a mapping of
+        ``{name: param_config}`` with one entry per A/E parameter to
+        calibrate.  Each *param_config* must contain ``current_param`` and
+        ``energy_param``; optional keys are ``dt_param``, ``dt_corr``,
+        ``dep_correct``, ``dt_cut``, ``pdf``, ``mean_func``, ``sigma_func``,
+        ``high_cut_val``, ``suffix`` (appended to the output parameter names
+        so entries don't collide), and ``plot_options``.  Optional top-level
+        key ``use_log_pdf`` (bool, default false): build the unbinned A/E
+        and survival-fraction fits from the models' log-densities (iminuit
+        ``log=True``) — substantially faster, results differ at
+        machine-precision level; requires a pygama version with
+        ``use_log_pdf`` support (silently ignored otherwise).
     debug_mode : bool
         Activates additional diagnostic output in :class:`~pygama.pargen.AoE_cal.CalAoE`.
         Defaults to ``False``.
     override_dict : dict, optional
         Per-detector override parameters passed to
-        :meth:`~pygama.pargen.AoE_cal.CalAoE.calibrate`.
+        :meth:`~pygama.pargen.AoE_cal.CalAoE.calibrate`.  With suffixed
+        ``params`` entries the override keys must use the suffixed names.
 
     Returns
     -------
     cal_dicts : dict
         Updated calibration operations mappings.
     out_result_dicts : dict
-        Updated results mappings including A/E results.
+        Updated results mappings; A/E results are nested per ``params``
+        entry under the ``aoe`` key.
     out_object_dicts : dict
-        Updated object mappings including the ``CalAoE`` instance.
+        Updated object mappings including one ``CalAoE`` instance per
+        ``params`` entry.
     out_plot_dicts : dict
-        Updated plot mappings including A/E diagnostic figures.
+        Updated plot mappings including A/E diagnostic figures per
+        ``params`` entry.
     """
     if isinstance(config, str | list):
         config = Props.read_from(config)
 
     if config.get("run_aoe", True) is True:
-        if "plot_options" in config:
-            for field, item in config["plot_options"].items():
-                config["plot_options"][field]["function"] = eval(item["function"])
-
-        if "dt_cut" in config and config["dt_cut"] is not None:
-            cut_dict = config["dt_cut"]["cut"]
-            for tstamp in cal_dicts:
-                cal_dicts[tstamp].update(cut_dict)
-
-            exp = cut_dict[next(iter(cut_dict))]["expression"]
-            for key in cut_dict[next(iter(cut_dict))]["parameters"]:
-                exp = re.sub(f"(?<![a-zA-Z0-9]){key}(?![a-zA-Z0-9])", f"@{key}", exp)
-            data[next(iter(cut_dict))] = data.eval(
-                exp, local_dict=cut_dict[next(iter(cut_dict))]["parameters"]
-            )
-
+        require_config_keys(
+            config,
+            ["cal_energy_param", "cut_field", "params"],
+            "aoe calibration config",
+        )
+        aoe_objs = {}
+        aoe_plot_dict = {}
+        out_dicts = {}
         try:
             eres = copy.deepcopy(
                 results_dicts[next(iter(results_dicts))]["partition_ecal"][
@@ -177,13 +178,6 @@ def run_aoe_calibration(
                 def eres_func(x):
                     return x * np.nan
 
-        data["AoE_Uncorr"] = (
-            data[config["current_param"]] / data[config["energy_param"]]
-        )
-
-        start = time.time()
-        log.info("calibrating A/E")
-
         # opt-in: build the unbinned A/E and survival-fraction fits from the
         # models' log-densities (iminuit log=True mode) — faster, results
         # differ at machine-precision level. Needs a pygama version with
@@ -193,59 +187,106 @@ def run_aoe_calibration(
             log.warning("installed pygama does not support use_log_pdf, ignoring")
             use_log_pdf = False
 
-        aoe = CalAoE(
-            cal_dicts=cal_dicts,
-            cal_energy_param=config["cal_energy_param"],
-            eres_func=eres_func,
-            pdf=eval(config.get("pdf", "aoe_peak")),
-            mean_func=eval(config.get("mean_func", "Pol1")),
-            sigma_func=eval(config.get("sigma_func", "SigmaFit")),
-            selection_string=f"{config['cut_field']}&(~is_pulser)",
-            dt_corr=config.get("dt_corr", False),
-            dep_correct=config.get("dep_correct", False),
-            dt_cut=config.get("dt_cut", None),
-            dt_param=config.get("dt_param", 3),
-            high_cut_val=config.get("high_cut_val", 3),
-            compt_bands_width=config.get("debug_mode", 20),
-            debug_mode=debug_mode | config.get("debug_mode", False),
-            **({"use_log_pdf": True} if use_log_pdf else {}),
-        )
-        aoe.update_cal_dicts(
-            {
-                "AoE_Uncorr": {
-                    "expression": f"{config['current_param']}/{config['energy_param']}",
-                    "parameters": {},
+        for name, param_config in config["params"].items():
+            require_config_keys(
+                param_config,
+                ["current_param", "energy_param"],
+                f"aoe calibration config params entry '{name}'",
+            )
+            if "plot_options" in param_config:
+                for field, item in param_config["plot_options"].items():
+                    param_config["plot_options"][field]["function"] = eval(
+                        item["function"]
+                    )
+
+            if "dt_cut" in param_config and param_config["dt_cut"] is not None:
+                cut_dict = param_config["dt_cut"]["cut"]
+                for tstamp in cal_dicts:
+                    cal_dicts[tstamp].update(cut_dict)
+
+                exp = cut_dict[next(iter(cut_dict))]["expression"]
+                for key in cut_dict[next(iter(cut_dict))]["parameters"]:
+                    exp = re.sub(
+                        f"(?<![a-zA-Z0-9]){key}(?![a-zA-Z0-9])", f"@{key}", exp
+                    )
+                data[next(iter(cut_dict))] = data.eval(
+                    exp, local_dict=cut_dict[next(iter(cut_dict))]["parameters"]
+                )
+
+            suffix = param_config.get("suffix", None)
+            initial_param = "AoE_Uncorr" if suffix is None else f"AoE_Uncorr_{suffix}"
+            data[initial_param] = (
+                data[param_config["current_param"]] / data[param_config["energy_param"]]
+            )
+
+            start = time.time()
+            msg = f"calibrating A/E for {name}"
+            log.info(msg)
+
+            aoe = CalAoE(
+                cal_dicts=cal_dicts,
+                cal_energy_param=config["cal_energy_param"],
+                eres_func=eres_func,
+                pdf=eval(param_config.get("pdf", "aoe_peak")),
+                mean_func=eval(param_config.get("mean_func", "Pol1")),
+                sigma_func=eval(param_config.get("sigma_func", "SigmaFit")),
+                selection_string=f"{config['cut_field']}&(~is_pulser)",
+                dt_corr=param_config.get("dt_corr", False),
+                dep_correct=param_config.get("dep_correct", False),
+                dt_cut=param_config.get("dt_cut", None),
+                dt_param=param_config.get("dt_param", 3),
+                high_cut_val=param_config.get("high_cut_val", 3),
+                compt_bands_width=config.get("debug_mode", 20),
+                debug_mode=debug_mode | config.get("debug_mode", False),
+                **({"use_log_pdf": True} if use_log_pdf else {}),
+            )
+            aoe.update_cal_dicts(
+                {
+                    initial_param: {
+                        "expression": f"{param_config['current_param']}/{param_config['energy_param']}",
+                        "parameters": {},
+                    }
                 }
-            }
-        )
-        aoe.calibrate(data, "AoE_Uncorr", override_dict=override_dict)
+            )
+            aoe.calibrate(
+                data,
+                initial_param,
+                override_dict=override_dict,
+                **({} if suffix is None else {"suffix": suffix}),
+            )
 
-        msg = f"A/E calibration completed in {time.time() - start:.2f} seconds"
-        log.info(msg)
+            msg = f"A/E calibration for {name} completed in {time.time() - start:.2f} seconds"
+            log.info(msg)
 
-        out_dict = get_results_dict(aoe)
-        aoe_plot_dict = fill_plot_dict(aoe, data, config.get("plot_options", None))
+            out_dicts[name] = get_results_dict(aoe)
+            aoe_plots = fill_plot_dict(
+                aoe, data, param_config.get("plot_options", None)
+            )
 
-        aoe.pdf = aoe.pdf.name
-        # need to change eres func as can't pickle lambdas
-        try:
-            aoe.eres_func = results_dicts[next(iter(results_dicts))]["partition_ecal"][
-                config["cal_energy_param"]
-            ]["eres_linear"]
-        except KeyError:
-            aoe.eres_func = {}
+            aoe.pdf = aoe.pdf.name
+            # need to change eres func as can't pickle lambdas
+            try:
+                aoe.eres_func = results_dicts[next(iter(results_dicts))][
+                    "partition_ecal"
+                ][config["cal_energy_param"]]["eres_linear"]
+            except KeyError:
+                aoe.eres_func = {}
+            aoe_objs[name] = copy.deepcopy(aoe)
+            aoe_plot_dict[name] = copy.deepcopy(aoe_plots)
     else:
-        out_dict = dict.fromkeys(cal_dicts)
+        out_dicts = {}
+        aoe_objs = {}
         aoe_plot_dict = {}
-        aoe = None
 
     out_result_dicts = {}
     for tstamp, result_dict in results_dicts.items():
-        out_result_dicts[tstamp] = dict(**result_dict, aoe=out_dict[tstamp])
+        out_result_dicts[tstamp] = dict(
+            **result_dict, aoe={name: d[tstamp] for name, d in out_dicts.items()}
+        )
 
     out_object_dicts = {}
     for tstamp, object_dict in object_dicts.items():
-        out_object_dicts[tstamp] = dict(**object_dict, aoe=aoe)
+        out_object_dicts[tstamp] = dict(**object_dict, aoe=aoe_objs)
 
     common_dict = (
         aoe_plot_dict.pop("common") if "common" in list(aoe_plot_dict) else None
@@ -381,27 +422,27 @@ def par_geds_hit_aoe() -> None:
     if kwarg_dict["run_aoe"] is True:
         require_config_keys(
             kwarg_dict,
-            ["current_param", "energy_param", "cal_energy_param", "cut_field"],
+            ["cal_energy_param", "cut_field", "threshold", "params"],
             f"aoe config ({args.config_file})",
         )
         params = [
-            kwarg_dict["current_param"],
-            "tp_0_est",
-            "tp_99",
-            kwarg_dict["energy_param"],
             kwarg_dict["cal_energy_param"],
             kwarg_dict["cut_field"],
+            "tp_0_est",
+            "tp_99",
             "timestamp",
         ]
-
-        if "dt_param" in kwarg_dict:
-            params.append(kwarg_dict["dt_param"])
-        else:
-            params.append("dt_eff")
-
-        if "dt_cut" in kwarg_dict and kwarg_dict["dt_cut"] is not None:
-            cal_dict.update(kwarg_dict["dt_cut"]["cut"])
-            params.append(kwarg_dict["dt_cut"]["out_param"])
+        for param_config in kwarg_dict["params"].values():
+            params.append(param_config["current_param"])
+            params.append(param_config["energy_param"])
+            if "dt_param" in param_config:
+                params.append(param_config["dt_param"])
+            else:
+                params.append("dt_eff")
+            if "dt_cut" in param_config and param_config["dt_cut"] is not None:
+                cal_dict.update(param_config["dt_cut"]["cut"])
+                params.append(param_config["dt_cut"]["out_param"])
+        params = list(dict.fromkeys(params))
         # load data in
         data, threshold_mask = load_data(
             files,
@@ -449,10 +490,10 @@ def par_geds_hit_aoe() -> None:
         )
         cal_dict = cal_dict[args.timestamp]
         results_dict = results_dicts[args.timestamp]
-        aoe = object_dicts[args.timestamp]
+        aoe = object_dicts[args.timestamp]["aoe"]
         plot_dict = plot_dicts[args.timestamp]
     else:
-        aoe = None
+        aoe = {}
         plot_dict = out_plot_dict
         results_dict = {}
     if args.plot_file:
