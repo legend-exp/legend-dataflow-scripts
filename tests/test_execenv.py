@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import logging
 import os
+import subprocess
 import sys
 
 import pytest
+import yaml
 from dbetto import AttrsDict
 
 from legenddataflowscripts.workflow import execenv
@@ -101,6 +104,96 @@ def test_execenv_pyexe(config):
         "--image=legendexp/legend-base:latest "
         ".snakemake/software/bin/dio-boe "
     )
+
+
+def test_execenv_prefix_pixi_mode():
+    # a config without an execenv section is a pixi-managed cycle: no
+    # container prefix, no env exports
+    for cfg in ({}, {"paths": {"install": "x"}}, {"execenv": {}}, {"execenv": None}):
+        assert execenv.execenv_prefix(cfg, as_string=True) == ""
+        assert execenv.execenv_prefix(cfg, as_string=False) == ([], {})
+
+
+def test_execenv_pyexe_pixi_mode():
+    # ... and executables resolve from the ambient environment's PATH
+    for cfg in ({}, {"paths": {"install": "x"}}, {"execenv": {}}):
+        assert execenv.execenv_pyexe(cfg, "dio-boe") == "dio-boe "
+        assert execenv.execenv_pyexe(cfg, "dio-boe", as_string=False) == (
+            ["dio-boe"],
+            {},
+        )
+
+
+def test_install_refuses_pixi_managed_cycle(tmp_path):
+    cfg = tmp_path / "dataflow-config.yaml"
+    cfg.write_text(yaml.dump({"paths": {"install": str(tmp_path / "venv")}}))
+
+    args = type(
+        "Args",
+        (),
+        {"config_file": str(cfg), "system": "bare", "remove": False, "editable": False},
+    )()
+    with pytest.raises(SystemExit, match="managed by pixi"):
+        execenv.install(args)
+
+
+def test_cmdexec_pixi_mode_runs_bare_command(monkeypatch, tmp_path):
+
+    cfg = tmp_path / "dataflow-config.yaml"
+    cfg.write_text(yaml.dump({"paths": {"install": str(tmp_path / "venv")}}))
+
+    calls = {}
+
+    def fake_run(cmd, **kwargs):
+        calls["cmd"] = cmd
+        calls["kwargs"] = kwargs
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    args = type(
+        "Args",
+        (),
+        {"config_file": str(cfg), "system": "bare", "command": ["echo", "hi"]},
+    )()
+    execenv.cmdexec(args)
+
+    assert calls["cmd"] == ["echo", "hi"]
+    # no env override: the ambient (pixi) environment is used as-is
+    assert "env" not in calls["kwargs"]
+
+
+def test_install_warns_deprecation_with_execenv(monkeypatch, tmp_path, caplog):
+
+    cfg = tmp_path / "dataflow-config.yaml"
+    cfg.write_text(
+        yaml.dump(
+            {
+                "paths": {"install": str(tmp_path / "venv")},
+                "execenv": {"bare": {"env": {"VAR1": "val1"}}},
+            }
+        )
+    )
+
+    # stop before any real venv work happens
+    def _stop(*_args, **_kwargs):
+        msg = "stop-here"
+        raise RuntimeError(msg)
+
+    monkeypatch.setattr(execenv.subprocess, "run", _stop)
+
+    args = type(
+        "Args",
+        (),
+        {"config_file": str(cfg), "system": "bare", "remove": False, "editable": False},
+    )()
+    with (
+        caplog.at_level(logging.WARNING, logger="legenddataflowscripts"),
+        pytest.raises(RuntimeError, match="stop-here"),
+    ):
+        execenv.install(args)
+
+    assert "deprecated" in caplog.text
+    assert "pixi" in caplog.text
 
 
 def test_dataflow_no_subcommand(monkeypatch, capsys):

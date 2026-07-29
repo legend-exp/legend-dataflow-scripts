@@ -21,7 +21,10 @@ Workflow Management
      - :func:`~legenddataflowscripts.workflow.execenv.dataflow`
      - Top-level CLI for installing software and executing commands inside the
        data-production environment (supports ``install`` and ``exec``
-       sub-commands).
+       sub-commands). *Deprecated* in favour of managing the cycle's software
+       environment with `pixi <https://pixi.sh>`_: production cycles that omit
+       the ``execenv:`` config section run all commands directly in the
+       ambient (pixi) environment.
    * - ``build-filedb``
      - :func:`~legenddataflowscripts.workflow.filedb.build_filedb`
      - Scan a directory of raw LH5 files and build a
