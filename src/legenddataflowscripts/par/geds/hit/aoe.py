@@ -132,6 +132,11 @@ def run_aoe_calibration(
         config = Props.read_from(config)
 
     if config.get("run_aoe", True) is True:
+        require_config_keys(
+            config,
+            ["cal_energy_param", "cut_field", "params"],
+            "aoe calibration config",
+        )
         aoe_objs = {}
         aoe_plot_dict = {}
         out_dicts = {}
@@ -164,6 +169,11 @@ def run_aoe_calibration(
                     return x * np.nan
 
         for name, param_config in config["params"].items():
+            require_config_keys(
+                param_config,
+                ["current_param", "energy_param"],
+                f"aoe calibration config params entry '{name}'",
+            )
             if "plot_options" in param_config:
                 for field, item in param_config["plot_options"].items():
                     param_config["plot_options"][field]["function"] = eval(
@@ -398,7 +408,12 @@ def par_geds_hit_aoe() -> None:
             "tp_99",
             "timestamp",
         ]
-        for param_config in kwarg_dict["params"].values():
+        for name, param_config in kwarg_dict["params"].items():
+            require_config_keys(
+                param_config,
+                ["current_param", "energy_param"],
+                f"aoe config params entry '{name}' ({args.config_file})",
+            )
             params.append(param_config["current_param"])
             params.append(param_config["energy_param"])
             if "dt_param" in param_config:
