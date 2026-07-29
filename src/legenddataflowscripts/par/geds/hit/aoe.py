@@ -432,7 +432,12 @@ def par_geds_hit_aoe() -> None:
             "tp_99",
             "timestamp",
         ]
-        for param_config in kwarg_dict["params"].values():
+        for name, param_config in kwarg_dict["params"].items():
+            require_config_keys(
+                param_config,
+                ["current_param", "energy_param"],
+                f"aoe config params entry '{name}' ({args.config_file})",
+            )
             params.append(param_config["current_param"])
             params.append(param_config["energy_param"])
             if "dt_param" in param_config:

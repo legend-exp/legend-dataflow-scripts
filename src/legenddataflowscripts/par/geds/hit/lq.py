@@ -453,7 +453,12 @@ def par_geds_hit_lq() -> None:
             kwarg_dict["cal_energy_param"],
             kwarg_dict["cut_field"],
         ]
-        for param_config in kwarg_dict["params"].values():
+        for name, param_config in kwarg_dict["params"].items():
+            require_config_keys(
+                param_config,
+                ["lq_param", "energy_param"],
+                f"lq config params entry '{name}' ({args.config_file})",
+            )
             params.append(param_config["lq_param"])
             params.append(param_config["energy_param"])
             params.append(param_config.get("dt_param", "dt_eff"))
