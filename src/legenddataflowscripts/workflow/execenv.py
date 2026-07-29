@@ -80,9 +80,10 @@ def execenv_prefix(
 
     Note
     ----
-    If *as_string* is ``True``, a space is appended to the returned string.
-    When *config* has no (non-empty) ``execenv`` section — i.e. the cycle's
-    software environment is managed by pixi — the prefix is empty.
+    If *as_string* is ``True``, a space is appended to the returned (non-empty)
+    string. When *config* has no (non-empty) ``execenv`` section — i.e. the
+    cycle's software environment is managed by pixi — the prefix is the empty
+    string, with no trailing space.
     """
     config = AttrsDict(config)
 
@@ -159,10 +160,11 @@ def execenv_pyexe(
 
     Note
     ----
-    If *as_string* is ``True``, a space is appended to the returned string.
-    When *config* has no (non-empty) ``execenv`` section — i.e. the cycle's
-    software environment is managed by pixi — the bare executable name is
-    returned and resolves from the ambient environment's ``PATH``.
+    If *as_string* is ``True``, a space is appended to the returned string
+    (in every mode). When *config* has no (non-empty) ``execenv`` section —
+    i.e. the cycle's software environment is managed by pixi — the bare
+    executable name is returned and resolves from the ambient environment's
+    ``PATH``.
     """
     config = AttrsDict(config)
 

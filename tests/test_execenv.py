@@ -116,7 +116,7 @@ def test_execenv_prefix_pixi_mode():
 
 def test_execenv_pyexe_pixi_mode():
     # ... and executables resolve from the ambient environment's PATH
-    for cfg in ({}, {"paths": {"install": "x"}}, {"execenv": {}}):
+    for cfg in ({}, {"paths": {"install": "x"}}, {"execenv": {}}, {"execenv": None}):
         assert execenv.execenv_pyexe(cfg, "dio-boe") == "dio-boe "
         assert execenv.execenv_pyexe(cfg, "dio-boe", as_string=False) == (
             ["dio-boe"],
