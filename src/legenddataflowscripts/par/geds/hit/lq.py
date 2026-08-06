@@ -24,6 +24,7 @@ from ....utils import (
     expand_filelist,
     fill_plot_dict,
     get_pulser_mask,
+    prepare_output_paths,
     require_config_keys,
 )
 
@@ -371,6 +372,9 @@ def par_geds_hit_lq() -> None:
     args = argparser.parse_args()
 
     build_log(args.log_config, args.log)
+
+    prepare_output_paths(args.plot_file, args.hit_pars, args.lq_results)
+
     kwarg_dict = Props.read_from(args.config_file)
     require_config_keys(kwarg_dict, ["run_lq"], f"lq config ({args.config_file})")
 
@@ -450,7 +454,6 @@ def par_geds_hit_lq() -> None:
         results_dict = {}
 
     if args.plot_file:
-        Path(args.plot_file).parent.mkdir(parents=True, exist_ok=True)
         with Path(args.plot_file).open("wb") as w:
             pkl.dump(plot_dict, w, protocol=pkl.HIGHEST_PROTOCOL)
 
@@ -460,13 +463,11 @@ def par_geds_hit_lq() -> None:
             "results": results_dict,
         }
     )
-    Path(args.hit_pars).parent.mkdir(parents=True, exist_ok=True)
     Props.write_to(args.hit_pars, final_hit_dict)
 
     final_object_dict = dict(
         **object_dict,
         lq=lq,
     )
-    Path(args.lq_results).parent.mkdir(parents=True, exist_ok=True)
     with Path(args.lq_results).open("wb") as w:
         pkl.dump(final_object_dict, w, protocol=pkl.HIGHEST_PROTOCOL)

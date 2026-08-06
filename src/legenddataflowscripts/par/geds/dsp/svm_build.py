@@ -8,7 +8,7 @@ import lh5
 from dbetto.catalog import Props
 from sklearn.svm import SVC
 
-from ....utils import build_log
+from ....utils import build_log, check_input_files, prepare_output_paths
 
 
 def par_geds_dsp_svm_build() -> None:
@@ -62,7 +62,14 @@ def par_geds_dsp_svm_build() -> None:
 
     log = build_log(args.log_config, args.log)
 
+    prepare_output_paths(args.output_file)
+
     if args.train_data is not None and len(args.train_data) > 0:
+        if args.train_hyperpars is None:
+            msg = "--train-hyperpars is required when --train-data is given"
+            raise ValueError(msg)
+        check_input_files(args.train_data, "--train-data")
+
         # Load files
         tb = lh5.read("ml_train/dsp", args.train_data)
         log.debug("loaded data")

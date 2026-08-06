@@ -23,6 +23,7 @@ from ....utils import (
     expand_filelist,
     fill_plot_dict,
     get_pulser_mask,
+    prepare_output_paths,
     require_config_keys,
 )
 
@@ -365,6 +366,9 @@ def par_geds_hit_aoe() -> None:
     args = argparser.parse_args()
 
     log = build_log(args.log_config, args.log)
+
+    prepare_output_paths(args.plot_file, args.hit_pars, args.aoe_results)
+
     kwarg_dict = Props.read_from(args.config_file)
     require_config_keys(kwarg_dict, ["run_aoe"], f"aoe config ({args.config_file})")
 
@@ -436,6 +440,9 @@ def par_geds_hit_aoe() -> None:
 
         override_dict = None
         if args.override_files:
+            if args.detector is None:
+                msg = "--detector is required when --override-files is given"
+                raise ValueError(msg)
             override_dict = Props.read_from(args.override_files)
             override_dict = override_dict.get(args.detector, None)
 
@@ -458,11 +465,9 @@ def par_geds_hit_aoe() -> None:
         plot_dict = out_plot_dict
         results_dict = {}
     if args.plot_file:
-        Path(args.plot_file).parent.mkdir(parents=True, exist_ok=True)
         with Path(args.plot_file).open("wb") as w:
             pkl.dump(plot_dict, w, protocol=pkl.HIGHEST_PROTOCOL)
 
-    Path(args.hit_pars).parent.mkdir(parents=True, exist_ok=True)
     final_hit_dict = {
         "pars": {"operations": cal_dict},
         "results": results_dict,
@@ -472,6 +477,5 @@ def par_geds_hit_aoe() -> None:
 
     Props.write_to(args.hit_pars, final_hit_dict)
 
-    Path(args.aoe_results).parent.mkdir(parents=True, exist_ok=True)
     with Path(args.aoe_results).open("wb") as w:
         pkl.dump(dict(**object_dict, aoe=aoe), w, protocol=pkl.HIGHEST_PROTOCOL)

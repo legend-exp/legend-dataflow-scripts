@@ -18,6 +18,7 @@ from ....utils import (
     convert_dict_np_to_float,
     expand_filelist,
     get_pulser_mask,
+    prepare_output_paths,
     require_config_keys,
 )
 
@@ -101,6 +102,9 @@ def par_geds_dsp_pz() -> None:
     args = argparser.parse_args()
 
     log = build_log(args.log_config, args.log)
+
+    prepare_output_paths(args.output_file, args.plot_path)
+
     kwarg_dict = Props.read_from(args.config_file)
     require_config_keys(kwarg_dict, ["run_tau"], f"pz config ({args.config_file})")
 
@@ -223,8 +227,6 @@ def par_geds_dsp_pz() -> None:
         tau.dsp_config = dsp_config_optimise_removed
 
         if args.plot_path:
-            Path(args.plot_path).parent.mkdir(parents=True, exist_ok=True)
-
             plot_dict = tau.plot_waveforms_after_correction(
                 tb_data,
                 kwarg_dict.get("wf_pz_field", "wf_pz"),
@@ -259,5 +261,4 @@ def par_geds_dsp_pz() -> None:
     else:
         out_dict = {}
 
-    Path(args.output_file).parent.mkdir(parents=True, exist_ok=True)
     Props.write_to(args.output_file, out_dict)

@@ -27,6 +27,7 @@ from ....utils import (
     convert_dict_np_to_float,
     expand_filelist,
     get_pulser_mask,
+    prepare_output_paths,
     require_config_keys,
 )
 
@@ -812,6 +813,8 @@ def par_geds_hit_ecal() -> None:
 
     log = build_log(args.log_config, args.log)
 
+    prepare_output_paths(args.plot_path, args.save_path, args.results_path)
+
     hit_dict = {}
     in_results_dict = {}
     if args.in_hit_dict:
@@ -821,15 +824,26 @@ def par_geds_hit_ecal() -> None:
 
     db_files = [
         par_file
-        for par_file in args.ctc_dict
+        for par_file in (args.ctc_dict or [])
         if Path(par_file).suffix in (".json", ".yml", ".yaml")
     ]
+    if args.ctc_dict and not db_files:
+        msg = (
+            f"--ctc-dict: none of the provided files {args.ctc_dict} has a "
+            ".json/.yml/.yaml extension"
+        )
+        raise ValueError(msg)
 
     database_dic = Props.read_from(db_files)
 
     if args.channel and args.channel in database_dic:
         database_dic = database_dic[args.channel]
 
+    require_config_keys(
+        database_dic,
+        ["ctc_params"],
+        f"ctc dict for channel {args.channel} ({args.ctc_dict})",
+    )
     hit_dict.update(database_dic["ctc_params"])
 
     kwarg_dict = Props.read_from(args.config_file)
@@ -1146,7 +1160,6 @@ def par_geds_hit_ecal() -> None:
 
         total_plot_dict.update({"ecal": plot_dict})
 
-        Path(args.plot_path).parent.mkdir(parents=True, exist_ok=True)
         with Path(args.plot_path).open("wb") as f:
             pkl.dump(total_plot_dict, f, protocol=pkl.HIGHEST_PROTOCOL)
 
@@ -1158,5 +1171,4 @@ def par_geds_hit_ecal() -> None:
 
     # save calibration objects
     with Path(args.results_path).open("wb") as fp:
-        Path(args.results_path).parent.mkdir(parents=True, exist_ok=True)
         pkl.dump({"ecal": full_object_dict}, fp, protocol=pkl.HIGHEST_PROTOCOL)

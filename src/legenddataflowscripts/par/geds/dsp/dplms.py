@@ -14,7 +14,14 @@ from pygama.pargen.data_cleaning import generate_cuts
 from pygama.pargen.dplms_ge_dict import dplms_ge_dict
 from pygama.pargen.dsp_optimize import run_one_dsp
 
-from ....utils import build_log, convert_dict_np_to_float, require_config_keys
+from ....utils import (
+    build_log,
+    check_input_files,
+    convert_dict_np_to_float,
+    expand_filelist,
+    prepare_output_paths,
+    require_config_keys,
+)
 
 
 def par_geds_dsp_dplms() -> None:
@@ -100,8 +107,13 @@ def par_geds_dsp_dplms() -> None:
 
     args = argparser.parse_args()
 
-    dsp_config = Props.read_from(args.processing_chain)
     log = build_log(args.log_config, args.log)
+
+    check_input_files(args.peak_file, "--peak-file")
+    check_input_files(args.inplots, "--inplots")
+    prepare_output_paths(args.lh5_path, args.dsp_pars, args.plot_path)
+
+    dsp_config = Props.read_from(args.processing_chain)
 
     t0 = time.time()
 
@@ -110,8 +122,7 @@ def par_geds_dsp_dplms() -> None:
     require_config_keys(dplms_dict, ["run_dplms"], f"dplms config ({args.config_file})")
 
     if dplms_dict["run_dplms"] is True:
-        with Path(args.fft_raw_filelist).open() as f:
-            fft_files = sorted(f.read().splitlines())
+        fft_files = expand_filelist([args.fft_raw_filelist], "--fft-raw-filelist")
 
         t0 = time.time()
         log.info("\nLoad fft data")
@@ -202,17 +213,14 @@ def par_geds_dsp_dplms() -> None:
 
     db_dict.update(out_dict)
 
-    Path(args.lh5_path).parent.mkdir(parents=True, exist_ok=True)
     lh5.write(
         Table(col_dict={"dplms": dplms_pars}),
         name=args.channel,
         lh5_file=args.lh5_path,
         wo_mode="overwrite",
     )
-    Path(args.dsp_pars).parent.mkdir(parents=True, exist_ok=True)
     Props.write_to(args.dsp_pars, convert_dict_np_to_float(db_dict))
 
     if args.plot_path:
-        Path(args.plot_path).parent.mkdir(parents=True, exist_ok=True)
         with Path(args.plot_path).open("wb") as f:
             pkl.dump(inplot_dict, f, protocol=pkl.HIGHEST_PROTOCOL)

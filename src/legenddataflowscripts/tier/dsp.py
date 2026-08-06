@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 import time
 import warnings
 from multiprocessing import Pool
@@ -9,11 +8,17 @@ from pathlib import Path
 
 import lh5
 import numpy as np
-from dbetto import TextDB
 from dbetto.catalog import Props
 from dspeed import build_dsp
 
-from ..utils import alias_table, build_log
+from ..utils import (
+    alias_table,
+    build_log,
+    check_input_files,
+    get_rule_config,
+    parse_json_arg,
+    prepare_output_paths,
+)
 
 warnings.filterwarnings(action="ignore", category=RuntimeWarning)
 
@@ -130,13 +135,20 @@ def build_tier_dsp() -> None:
     # set number of threads to use
     # set_num_threads(1)
 
-    table_map = json.loads(args.table_map)
-
-    df_configs = TextDB(args.configs, lazy=True)
-    config_dict = df_configs.on(args.timestamp, system=args.datatype).snakemake_rules
-    config_dict = config_dict[f"tier_{args.tier}"]
+    config_dict = get_rule_config(
+        args.configs, f"tier_{args.tier}", args.timestamp, args.datatype
+    )
 
     log = build_log(config_dict, args.log, fallback=__name__)
+
+    table_map = parse_json_arg(args.table_map, "--table-map")
+    alias_map = (
+        parse_json_arg(args.alias_table, "--alias-table")
+        if args.alias_table is not None
+        else None
+    )
+    check_input_files(args.input, "--input")
+    prepare_output_paths(args.output)
 
     settings_dict = config_dict.options.get("settings", {})
     if isinstance(settings_dict, str):
@@ -175,6 +187,12 @@ def build_tier_dsp() -> None:
         for par_file in args.pars_file
         if Path(par_file).suffix in (".json", ".yaml", ".yml")
     ]
+    if args.pars_file and not db_files:
+        msg = (
+            f"--pars-file: none of the provided files {args.pars_file} has a "
+            ".json/.yaml/.yml extension"
+        )
+        raise ValueError(msg)
 
     database_dict = _replace_list_with_array(
         Props.read_from(db_files, subst_pathvar=True)
@@ -184,8 +202,6 @@ def build_tier_dsp() -> None:
         for chan, dic in database_dict.items()
     }
     log.info("loaded database files")
-
-    Path(args.output).parent.mkdir(parents=True, exist_ok=True)
 
     start = time.time()
     if args.n_processes > 1:
@@ -252,9 +268,9 @@ def build_tier_dsp() -> None:
 
     msg = f"Finished building DSP in {time.time() - start:.2f} seconds"
     log.info(msg)
-    if args.alias_table is not None:
+    if alias_map is not None:
         log.info("Creating alias table")
-        alias_table(args.output, args.alias_table)
+        alias_table(args.output, alias_map)
 
 
 def build_tier_dsp_single_channel() -> None:
@@ -315,9 +331,9 @@ def build_tier_dsp_single_channel() -> None:
     argparser.add_argument("--output", help="output file")
     args = argparser.parse_args()
 
-    df_configs = TextDB(args.configs, lazy=True)
-    config_dict = df_configs.on(args.timestamp, system=args.datatype).snakemake_rules
-    config_dict = config_dict[f"tier_{args.tier}"]
+    config_dict = get_rule_config(
+        args.configs, f"tier_{args.tier}", args.timestamp, args.datatype
+    )
     config_dict = (
         config_dict[args.channel]
         if args.channel is not None and args.channel in config_dict
@@ -325,6 +341,9 @@ def build_tier_dsp_single_channel() -> None:
     )
 
     log = build_log(config_dict, args.log, fallback=__name__)
+
+    check_input_files(args.input, "--input")
+    prepare_output_paths(args.output)
 
     settings_dict = config_dict.options.get("settings", {})
     if isinstance(settings_dict, str):
@@ -338,6 +357,12 @@ def build_tier_dsp_single_channel() -> None:
         for par_file in args.pars_file
         if Path(par_file).suffix in (".json", ".yaml", ".yml")
     ]
+    if args.pars_file and not db_files:
+        msg = (
+            f"--pars-file: none of the provided files {args.pars_file} has a "
+            ".json/.yaml/.yml extension"
+        )
+        raise ValueError(msg)
 
     database_dict = _replace_list_with_array(
         Props.read_from(db_files, subst_pathvar=True)
@@ -347,8 +372,6 @@ def build_tier_dsp_single_channel() -> None:
         if args.channel is not None and args.channel in database_dict
         else database_dict
     )
-
-    Path(args.output).parent.mkdir(parents=True, exist_ok=True)
 
     start = time.time()
 

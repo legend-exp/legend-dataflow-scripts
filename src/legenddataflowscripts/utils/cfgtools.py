@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
+from pathlib import Path
 
 from dbetto import TextDB
 
@@ -81,6 +82,9 @@ def get_rule_config(configs_path, rule_name, timestamp, datatype):
     missing key names the rule, timestamp, datatype and config path instead
     of raising a bare :class:`KeyError`.
     """
+    if not Path(configs_path).is_dir():
+        msg = f"config directory {configs_path} does not exist"
+        raise FileNotFoundError(msg)
     configs = TextDB(configs_path, lazy=True).on(timestamp, category=datatype)
     try:
         return configs["snakemake_rules"][rule_name]

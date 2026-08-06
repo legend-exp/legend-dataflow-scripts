@@ -12,7 +12,13 @@ from dbetto.catalog import Props
 from dspeed import build_dsp
 from pygama.pargen.data_cleaning import generate_cuts, get_cut_indexes
 
-from ....utils import build_log, require_config_keys
+from ....utils import (
+    build_log,
+    check_input_files,
+    expand_filelist,
+    prepare_output_paths,
+    require_config_keys,
+)
 
 
 def par_geds_dsp_nopt() -> None:
@@ -84,8 +90,12 @@ def par_geds_dsp_nopt() -> None:
 
     args = argparser.parse_args()
 
-    dsp_config = Props.read_from(args.processing_chain)
     log = build_log(args.log_config, args.log)
+
+    check_input_files(args.inplots, "--inplots")
+    prepare_output_paths(args.dsp_pars, args.plot_path)
+
+    dsp_config = Props.read_from(args.processing_chain)
 
     t0 = time.time()
 
@@ -94,10 +104,7 @@ def par_geds_dsp_nopt() -> None:
     require_config_keys(opt_dict, ["run_nopt"], f"nopt config ({args.config_file})")
 
     if opt_dict.pop("run_nopt") is True:
-        with Path(args.raw_filelist).open() as f:
-            files = f.read().splitlines()
-
-        raw_files = sorted(files)
+        raw_files = expand_filelist([args.raw_filelist], "--raw-filelist")
 
         energies = lh5.read_as(
             f"{args.raw_table_name}/daqenergy", raw_files, library="np"
@@ -152,7 +159,6 @@ def par_geds_dsp_nopt() -> None:
         plot_dict = {}
 
     if args.plot_path:
-        Path(args.plot_path).parent.mkdir(parents=True, exist_ok=True)
         if args.inplots:
             with Path(args.inplots).open("rb") as r:
                 old_plot_dict = pkl.load(r)
@@ -162,5 +168,4 @@ def par_geds_dsp_nopt() -> None:
         with Path(args.plot_path).open("wb") as f:
             pkl.dump(plot_dict, f, protocol=pkl.HIGHEST_PROTOCOL)
 
-    Path(args.dsp_pars).parent.mkdir(parents=True, exist_ok=True)
     Props.write_to(args.dsp_pars, {**db_dict, "nopt_pars": out_dict})

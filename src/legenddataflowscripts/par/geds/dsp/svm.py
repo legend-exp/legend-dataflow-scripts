@@ -5,6 +5,8 @@ from pathlib import Path
 
 from dbetto.catalog import Props
 
+from ....utils import check_input_files
+
 
 def par_geds_dsp_svm() -> None:
     """Register a pre-trained SVM model file in the DSP parameter database.
@@ -43,6 +45,9 @@ def par_geds_dsp_svm() -> None:
     )
     argparser.add_argument("--svm-file", help="svm file", required=True)
     args = argparser.parse_args()
+
+    # a bad --svm-file would otherwise be silently embedded into the pars
+    check_input_files(args.svm_file, "--svm-file")
 
     par_data = Props.read_from(args.input_file) if args.input_file else {}
 
