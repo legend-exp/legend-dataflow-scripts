@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+import inspect
 import logging
 import pickle as pkl
 import re
@@ -105,7 +106,12 @@ def run_aoe_calibration(
     config : dict or str or list
         A/E calibration configuration.  Must contain ``run_aoe`` (bool),
         ``current_param``, ``energy_param``, ``cal_energy_param``,
-        ``cut_field``, and ``threshold``.
+        ``cut_field``, and ``threshold``.  Optional key ``use_log_pdf``
+        (bool, default false): build the unbinned A/E and survival-fraction
+        fits from the models' log-densities (iminuit ``log=True``) —
+        substantially faster, results differ at machine-precision level;
+        requires a pygama version with ``use_log_pdf`` support (silently
+        ignored otherwise).
     debug_mode : bool
         Activates additional diagnostic output in :class:`~pygama.pargen.AoE_cal.CalAoE`.
         Defaults to ``False``.
@@ -192,6 +198,17 @@ def run_aoe_calibration(
             start = time.time()
             log.info("calibrating A/E")
 
+
+            # opt-in: build the unbinned A/E and survival-fraction fits from the
+            # models' log-densities (iminuit log=True mode) — faster, results
+            # differ at machine-precision level. Needs a pygama version with
+            # use_log_pdf support; fall back silently on older versions.
+            use_log_pdf = config.get("use_log_pdf", False)
+            if use_log_pdf and "use_log_pdf" not in inspect.signature(CalAoE).parameters:
+                log.warning("installed pygama does not support use_log_pdf, ignoring")
+                use_log_pdf = False
+
+
             aoe = CalAoE(
                 cal_dicts=cal_dicts,
                 cal_energy_param=config["cal_energy_param"],
@@ -207,6 +224,7 @@ def run_aoe_calibration(
                 high_cut_val=param_config.get("high_cut_val", 3),
                 compt_bands_width=config.get("debug_mode", 20),
                 debug_mode=debug_mode | config.get("debug_mode", False),
+                **({"use_log_pdf": True} if use_log_pdf else {}),
             )
             aoe.update_cal_dicts(
                 {

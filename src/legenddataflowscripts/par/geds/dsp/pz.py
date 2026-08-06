@@ -17,9 +17,11 @@ from ....utils import (
     check_pulser_mask,
     convert_dict_np_to_float,
     expand_filelist,
+    get_is_recovering_mask,
     get_pulser_mask,
     prepare_output_paths,
     require_config_keys,
+    take_table_rows,
 )
 
 
@@ -134,7 +136,10 @@ def par_geds_dsp_pz() -> None:
             args.raw_table_name,
             input_file,
             field_mask=["daqenergy", "timestamp", "t_sat_lo"],
-        ).view_as("pd")
+        )
+        daqenergy = data["daqenergy"].nda
+        timestamps = data["timestamp"].nda
+        t_sat_lo = data["t_sat_lo"].nda
         threshold = kwarg_dict.pop("threshold")
 
         if args.no_pulse is False and (
@@ -148,24 +153,15 @@ def par_geds_dsp_pz() -> None:
         else:
             mask = np.full(len(data), False)
 
-        discharges = data["t_sat_lo"] > 0
-        discharge_timestamps = np.where(data["timestamp"][discharges])[0]
-        is_recovering = np.full(len(data), False, dtype=bool)
-        for tstamp in discharge_timestamps:
-            is_recovering = is_recovering | np.where(
-                (
-                    ((data["timestamp"] - tstamp) < 0.01)
-                    & ((data["timestamp"] - tstamp) > 0)
-                ),
-                True,
-                False,
-            )
-        cuts = np.where(
-            (data.daqenergy.to_numpy() > threshold) & (~mask) & (~is_recovering)
-        )[0]
+        discharges = t_sat_lo > 0
+        discharge_timestamps = np.where(timestamps[discharges])[0]
+        is_recovering = get_is_recovering_mask(timestamps, discharge_timestamps)
+        cuts = np.where((daqenergy > threshold) & (~mask) & (~is_recovering))[0]
         msg = f"{len(cuts)} events passed threshold and pulser cuts"
         log.debug(msg)
         log.debug(cuts)
+        del data, daqenergy, timestamps, t_sat_lo, mask, is_recovering, discharges
+        del discharge_timestamps
         tb_data = lh5.read(
             args.raw_table_name,
             input_file,
@@ -189,12 +185,17 @@ def par_geds_dsp_pz() -> None:
             log.debug("Applied cuts")
             msg = f"{len(idxs)} events passed cuts"
             log.debug(msg)
-            tb_data = lh5.read(
-                args.raw_table_name,
-                input_file,
-                idx=cuts[: 2 * kwarg_dict["n_events"]][idxs],
-                n_rows=kwarg_dict.pop("n_events"),
-            )
+            # tb_data already holds exactly the rows cuts[:2*n_events], so
+            # subset it in memory instead of re-reading the raw files
+            # (row-identical: the read idx was cuts[:2*n_events][idxs] with
+            # the first n_events kept, both in ascending row order)
+            del tb_out
+            sel = np.asarray(idxs)
+            # get_cut_indexes returns a boolean mask; also accept an index
+            # array in case that ever changes
+            if sel.dtype == np.bool_:
+                sel = np.flatnonzero(sel)
+            tb_data = take_table_rows(tb_data, sel[: kwarg_dict.pop("n_events")])
 
         tau = PZCorrect(
             dsp_config,
