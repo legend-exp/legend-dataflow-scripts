@@ -105,35 +105,49 @@ def run_aoe_calibration(
         ``{timestamp: plot_dict}`` mapping of existing plot dictionaries.
     config : dict or str or list
         A/E calibration configuration.  Must contain ``run_aoe`` (bool),
-        ``current_param``, ``energy_param``, ``cal_energy_param``,
-        ``cut_field``, and ``threshold``.  Optional key ``use_log_pdf``
-        (bool, default false): build the unbinned A/E and survival-fraction
-        fits from the models' log-densities (iminuit ``log=True``) —
-        substantially faster, results differ at machine-precision level;
-        requires a pygama version with ``use_log_pdf`` support (silently
-        ignored otherwise).
+        ``cal_energy_param``, ``cut_field``, and ``params`` — a mapping of
+        ``{name: param_config}`` with one entry per A/E parameter to
+        calibrate.  Each *param_config* must contain ``current_param`` and
+        ``energy_param``; optional keys are ``dt_param``, ``dt_corr``,
+        ``dep_correct``, ``dt_cut``, ``pdf``, ``mean_func``, ``sigma_func``,
+        ``high_cut_val``, ``suffix`` (appended to the output parameter names
+        so entries don't collide), and ``plot_options``.  Optional top-level
+        key ``use_log_pdf`` (bool, default false): build the unbinned A/E
+        and survival-fraction fits from the models' log-densities (iminuit
+        ``log=True``) — substantially faster, results differ at
+        machine-precision level; requires a pygama version with
+        ``use_log_pdf`` support (silently ignored otherwise).
     debug_mode : bool
         Activates additional diagnostic output in :class:`~pygama.pargen.AoE_cal.CalAoE`.
         Defaults to ``False``.
     override_dict : dict, optional
         Per-detector override parameters passed to
-        :meth:`~pygama.pargen.AoE_cal.CalAoE.calibrate`.
+        :meth:`~pygama.pargen.AoE_cal.CalAoE.calibrate`.  With suffixed
+        ``params`` entries the override keys must use the suffixed names.
 
     Returns
     -------
     cal_dicts : dict
         Updated calibration operations mappings.
     out_result_dicts : dict
-        Updated results mappings including A/E results.
+        Updated results mappings; A/E results are nested per ``params``
+        entry under the ``aoe`` key.
     out_object_dicts : dict
-        Updated object mappings including the ``CalAoE`` instance.
+        Updated object mappings including one ``CalAoE`` instance per
+        ``params`` entry.
     out_plot_dicts : dict
-        Updated plot mappings including A/E diagnostic figures.
+        Updated plot mappings including A/E diagnostic figures per
+        ``params`` entry.
     """
     if isinstance(config, str | list):
         config = Props.read_from(config)
 
     if config.get("run_aoe", True) is True:
+        require_config_keys(
+            config,
+            ["cal_energy_param", "cut_field", "params"],
+            "aoe calibration config",
+        )
         aoe_objs = {}
         aoe_plot_dict = {}
         out_dicts = {}
@@ -165,7 +179,21 @@ def run_aoe_calibration(
                 def eres_func(x):
                     return x * np.nan
 
+        # opt-in: build the unbinned A/E and survival-fraction fits from the
+        # models' log-densities (iminuit log=True mode) — faster, results
+        # differ at machine-precision level. Needs a pygama version with
+        # use_log_pdf support; fall back silently on older versions.
+        use_log_pdf = config.get("use_log_pdf", False)
+        if use_log_pdf and "use_log_pdf" not in inspect.signature(CalAoE).parameters:
+            log.warning("installed pygama does not support use_log_pdf, ignoring")
+            use_log_pdf = False
+
         for name, param_config in config["params"].items():
+            require_config_keys(
+                param_config,
+                ["current_param", "energy_param"],
+                f"aoe calibration config params entry '{name}'",
+            )
             if "plot_options" in param_config:
                 for field, item in param_config["plot_options"].items():
                     param_config["plot_options"][field]["function"] = eval(
@@ -186,27 +214,14 @@ def run_aoe_calibration(
                     exp, local_dict=cut_dict[next(iter(cut_dict))]["parameters"]
                 )
 
-            initial_param = (
-                "AoE_uncorr"
-                if param_config.get("suffix", None) is None
-                else f"AoE_Uncorr_{param_config['suffix']}"
-            )
+            suffix = param_config.get("suffix", None)
+            initial_param = "AoE_Uncorr" if suffix is None else f"AoE_Uncorr_{suffix}"
             data[initial_param] = (
                 data[param_config["current_param"]] / data[param_config["energy_param"]]
             )
 
             start = time.time()
-            log.info("calibrating A/E")
-
-
-            # opt-in: build the unbinned A/E and survival-fraction fits from the
-            # models' log-densities (iminuit log=True mode) — faster, results
-            # differ at machine-precision level. Needs a pygama version with
-            # use_log_pdf support; fall back silently on older versions.
-            use_log_pdf = config.get("use_log_pdf", False)
-            if use_log_pdf and "use_log_pdf" not in inspect.signature(CalAoE).parameters:
-                log.warning("installed pygama does not support use_log_pdf, ignoring")
-                use_log_pdf = False
+            log.info(f"calibrating A/E for {name}")
 
 
             aoe = CalAoE(
@@ -238,10 +253,10 @@ def run_aoe_calibration(
                 data,
                 initial_param,
                 override_dict=override_dict,
-                suffix=param_config.get("suffix", None),
+                **({} if suffix is None else {"suffix": suffix}),
             )
 
-            msg = f"A/E calibration completed in {time.time() - start:.2f} seconds"
+            msg = f"A/E calibration for {name} completed in {time.time() - start:.2f} seconds"
             log.info(msg)
 
             out_dicts[name] = get_results_dict(aoe)
@@ -257,8 +272,8 @@ def run_aoe_calibration(
                 ][config["cal_energy_param"]]["eres_linear"]
             except KeyError:
                 aoe.eres_func = {}
-            aoe_objs[name] = deepcopy(aoe)
-            aoe_plot_dict[name] = deepcopy(aoe_plots)
+            aoe_objs[name] = copy.deepcopy(aoe)
+            aoe_plot_dict[name] = copy.deepcopy(aoe_plots)
     else:
         out_dicts = {}
         aoe_objs = {}
@@ -408,7 +423,7 @@ def par_geds_hit_aoe() -> None:
     if kwarg_dict["run_aoe"] is True:
         require_config_keys(
             kwarg_dict,
-            ["current_param", "energy_param", "cal_energy_param", "cut_field"],
+            ["cal_energy_param", "cut_field", "threshold", "params"],
             f"aoe config ({args.config_file})",
         )
         params = [
@@ -418,7 +433,12 @@ def par_geds_hit_aoe() -> None:
             "tp_99",
             "timestamp",
         ]
-        for param_config in kwarg_dict["params"].values():
+        for name, param_config in kwarg_dict["params"].items():
+            require_config_keys(
+                param_config,
+                ["current_param", "energy_param"],
+                f"aoe config params entry '{name}' ({args.config_file})",
+            )
             params.append(param_config["current_param"])
             params.append(param_config["energy_param"])
             if "dt_param" in param_config:
@@ -476,10 +496,10 @@ def par_geds_hit_aoe() -> None:
         )
         cal_dict = cal_dict[args.timestamp]
         results_dict = results_dicts[args.timestamp]
-        aoe = object_dicts[args.timestamp]
+        aoe = object_dicts[args.timestamp]["aoe"]
         plot_dict = plot_dicts[args.timestamp]
     else:
-        aoe = None
+        aoe = {}
         plot_dict = out_plot_dict
         results_dict = {}
     if args.plot_file:
