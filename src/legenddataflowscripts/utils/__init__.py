@@ -1,7 +1,12 @@
 from __future__ import annotations
 
 from .alias_table import alias_table
-from .cfgtools import get_channel_config, get_rule_config, require_config_keys
+from .cfgtools import (
+    get_channel_config,
+    get_rule_config,
+    require_config_keys,
+    require_peaks_present,
+)
 from .convert_np import convert_dict_np_to_float
 from .discharge import get_is_recovering_mask
 from .files import (
@@ -30,5 +35,6 @@ __all__ = [
     "parse_json_arg",
     "prepare_output_paths",
     "require_config_keys",
+    "require_peaks_present",
     "take_table_rows",
 ]
