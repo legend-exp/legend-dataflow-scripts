@@ -14,7 +14,16 @@ from pygama.pargen.data_cleaning import generate_cuts
 from pygama.pargen.dplms_ge_dict import dplms_ge_dict
 from pygama.pargen.dsp_optimize import run_one_dsp
 
-from ....utils import build_log, convert_dict_np_to_float, require_config_keys
+from ....utils import (
+    build_log,
+    check_input_files,
+    convert_dict_np_to_float,
+    expand_filelist,
+    prepare_output_paths,
+    require_config_keys,
+    require_peaks_present,
+    take_table_rows,
+)
 
 
 def par_geds_dsp_dplms() -> None:
@@ -55,7 +64,13 @@ def par_geds_dsp_dplms() -> None:
         Processing chain configuration file(s).
     ``--config-file`` : list of str
         DPLMS configuration file(s).  Must contain ``run_dplms`` (bool),
-        ``n_baselines`` (int), and ``peaks_kev`` (list).
+        ``n_baselines`` (int), and ``peaks_kev`` (list).  The optional key
+        ``use_log_pdf`` (bool, default false) is forwarded to
+        :func:`pygama.pargen.dplms_ge_dict.dplms_ge_dict` and builds the
+        grid-search FOM fits from the model's log-density (iminuit
+        ``log=True``) — substantially faster, results differ at
+        machine-precision level; requires a pygama version with
+        ``use_log_pdf`` support.
     ``--channel`` : str
         Channel identifier; used as the HDF5 group name in *lh5-path*.
     ``--raw-table-name`` : str
@@ -100,8 +115,13 @@ def par_geds_dsp_dplms() -> None:
 
     args = argparser.parse_args()
 
-    dsp_config = Props.read_from(args.processing_chain)
     log = build_log(args.log_config, args.log)
+
+    check_input_files(args.peak_file, "--peak-file")
+    check_input_files(args.inplots, "--inplots")
+    prepare_output_paths(args.lh5_path, args.dsp_pars, args.plot_path)
+
+    dsp_config = Props.read_from(args.processing_chain)
 
     t0 = time.time()
 
@@ -110,8 +130,7 @@ def par_geds_dsp_dplms() -> None:
     require_config_keys(dplms_dict, ["run_dplms"], f"dplms config ({args.config_file})")
 
     if dplms_dict["run_dplms"] is True:
-        with Path(args.fft_raw_filelist).open() as f:
-            fft_files = sorted(f.read().splitlines())
+        fft_files = expand_filelist([args.fft_raw_filelist], "--fft-raw-filelist")
 
         t0 = time.time()
         log.info("\nLoad fft data")
@@ -131,17 +150,20 @@ def par_geds_dsp_dplms() -> None:
 
         log.info("\nRunning event selection")
         peaks_kev = np.array(dplms_dict["peaks_kev"])
-        # kev_widths = [tuple(kev_width) for kev_width in dplms_dict["kev_widths"]]
 
         peaks_rounded = [int(peak) for peak in peaks_kev]
         peaks = lh5.read_as(f"{args.raw_table_name}/peak", args.peak_file, library="np")
+        require_peaks_present(
+            np.unique(peaks),
+            peaks_rounded,
+            f"peak file {args.peak_file} requested by dplms config ({args.config_file})",
+        )
         ids = np.isin(peaks, peaks_rounded)
-        peaks = peaks[ids]
-        # idx_list = [np.where(peaks == peak)[0] for peak in peaks_rounded]
 
         raw_cal = lh5.read(args.raw_table_name, args.peak_file, idx=ids)
         msg = f"Time to run event selection {(time.time() - t1):.2f} s, total events {len(raw_cal)}"
         log.info(msg)
+        del peaks, ids
 
         if isinstance(dsp_config, str | list):
             dsp_config = Props.read_from(dsp_config)
@@ -157,13 +179,12 @@ def par_geds_dsp_dplms() -> None:
         for cut in cut_dict:
             idxs = dsp_fft[cut].nda & idxs
 
-        selected_eidxs = eidxs[: len(dsp_fft)]
-        raw_fft = lh5.read(
-            args.raw_table_name,
-            fft_files,
-            n_rows=dplms_dict["n_baselines"],
-            idx=selected_eidxs[idxs],
-        )
+        # idxs is a boolean mask over the rows already loaded in raw_fft, so
+        # subset in memory instead of re-reading the FFT files from disk
+        # (row-identical: the first read was idx=eidxs capped at n_baselines,
+        # so the re-applied n_rows cap was a no-op)
+        raw_fft = take_table_rows(raw_fft, idxs)
+        del dsp_fft, energies, eidxs, cut_dict, idxs
 
         log.debug("Applied Cuts")
 
@@ -202,17 +223,14 @@ def par_geds_dsp_dplms() -> None:
 
     db_dict.update(out_dict)
 
-    Path(args.lh5_path).parent.mkdir(parents=True, exist_ok=True)
     lh5.write(
         Table(col_dict={"dplms": dplms_pars}),
         name=args.channel,
         lh5_file=args.lh5_path,
         wo_mode="overwrite",
     )
-    Path(args.dsp_pars).parent.mkdir(parents=True, exist_ok=True)
     Props.write_to(args.dsp_pars, convert_dict_np_to_float(db_dict))
 
     if args.plot_path:
-        Path(args.plot_path).parent.mkdir(parents=True, exist_ok=True)
         with Path(args.plot_path).open("wb") as f:
             pkl.dump(inplot_dict, f, protocol=pkl.HIGHEST_PROTOCOL)

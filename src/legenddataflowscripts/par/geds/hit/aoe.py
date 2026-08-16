@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import argparse
 import copy
+import inspect
 import logging
 import pickle as pkl
 import re
 import time
 import warnings
-from copy import deepcopy
 from pathlib import Path
 
 import numpy as np
@@ -23,7 +23,9 @@ from ....utils import (
     expand_filelist,
     fill_plot_dict,
     get_pulser_mask,
+    prepare_output_paths,
     require_config_keys,
+    require_unique_suffixes,
 )
 
 log = logging.getLogger(__name__)
@@ -109,24 +111,33 @@ def run_aoe_calibration(
         ``energy_param``; optional keys are ``dt_param``, ``dt_corr``,
         ``dep_correct``, ``dt_cut``, ``pdf``, ``mean_func``, ``sigma_func``,
         ``high_cut_val``, ``suffix`` (appended to the output parameter names
-        so entries don't collide), and ``plot_options``.
+        so entries don't collide), and ``plot_options``.  Optional top-level
+        key ``use_log_pdf`` (bool, default false): build the unbinned A/E
+        and survival-fraction fits from the models' log-densities (iminuit
+        ``log=True``) — substantially faster, results differ at
+        machine-precision level; requires a pygama version with
+        ``use_log_pdf`` support (silently ignored otherwise).
     debug_mode : bool
         Activates additional diagnostic output in :class:`~pygama.pargen.AoE_cal.CalAoE`.
         Defaults to ``False``.
     override_dict : dict, optional
         Per-detector override parameters passed to
-        :meth:`~pygama.pargen.AoE_cal.CalAoE.calibrate`.
+        :meth:`~pygama.pargen.AoE_cal.CalAoE.calibrate`.  With suffixed
+        ``params`` entries the override keys must use the suffixed names.
 
     Returns
     -------
     cal_dicts : dict
         Updated calibration operations mappings.
     out_result_dicts : dict
-        Updated results mappings including A/E results.
+        Updated results mappings; A/E results are nested per ``params``
+        entry under the ``aoe`` key.
     out_object_dicts : dict
-        Updated object mappings including the ``CalAoE`` instance.
+        Updated object mappings including one ``CalAoE`` instance per
+        ``params`` entry.
     out_plot_dicts : dict
-        Updated plot mappings including A/E diagnostic figures.
+        Updated plot mappings including A/E diagnostic figures per
+        ``params`` entry.
     """
     if isinstance(config, str | list):
         config = Props.read_from(config)
@@ -137,6 +148,7 @@ def run_aoe_calibration(
             ["cal_energy_param", "cut_field", "params"],
             "aoe calibration config",
         )
+        require_unique_suffixes(config["params"], "aoe calibration config")
         aoe_objs = {}
         aoe_plot_dict = {}
         out_dicts = {}
@@ -167,6 +179,15 @@ def run_aoe_calibration(
 
                 def eres_func(x):
                     return x * np.nan
+
+        # opt-in: build the unbinned A/E and survival-fraction fits from the
+        # models' log-densities (iminuit log=True mode) — faster, results
+        # differ at machine-precision level. Needs a pygama version with
+        # use_log_pdf support; fall back silently on older versions.
+        use_log_pdf = config.get("use_log_pdf", False)
+        if use_log_pdf and "use_log_pdf" not in inspect.signature(CalAoE).parameters:
+            log.warning("installed pygama does not support use_log_pdf, ignoring")
+            use_log_pdf = False
 
         for name, param_config in config["params"].items():
             require_config_keys(
@@ -201,7 +222,8 @@ def run_aoe_calibration(
             )
 
             start = time.time()
-            log.info("calibrating A/E")
+            msg = f"calibrating A/E for {name}"
+            log.info(msg)
 
             aoe = CalAoE(
                 cal_dicts=cal_dicts,
@@ -216,8 +238,11 @@ def run_aoe_calibration(
                 dt_cut=param_config.get("dt_cut", None),
                 dt_param=param_config.get("dt_param", 3),
                 high_cut_val=param_config.get("high_cut_val", 3),
-                compt_bands_width=config.get("debug_mode", 20),
+                compt_bands_width=param_config.get(
+                    "compt_bands_width", config.get("compt_bands_width", 20)
+                ),
                 debug_mode=debug_mode | config.get("debug_mode", False),
+                **({"use_log_pdf": True} if use_log_pdf else {}),
             )
             aoe.update_cal_dicts(
                 {
@@ -234,7 +259,7 @@ def run_aoe_calibration(
                 **({} if suffix is None else {"suffix": suffix}),
             )
 
-            msg = f"A/E calibration completed in {time.time() - start:.2f} seconds"
+            msg = f"A/E calibration for {name} completed in {time.time() - start:.2f} seconds"
             log.info(msg)
 
             out_dicts[name] = get_results_dict(aoe)
@@ -250,8 +275,8 @@ def run_aoe_calibration(
                 ][config["cal_energy_param"]]["eres_linear"]
             except KeyError:
                 aoe.eres_func = {}
-            aoe_objs[name] = deepcopy(aoe)
-            aoe_plot_dict[name] = deepcopy(aoe_plots)
+            aoe_objs[name] = copy.deepcopy(aoe)
+            aoe_plot_dict[name] = copy.deepcopy(aoe_plots)
     else:
         out_dicts = {}
         aoe_objs = {}
@@ -377,6 +402,9 @@ def par_geds_hit_aoe() -> None:
     args = argparser.parse_args()
 
     log = build_log(args.log_config, args.log)
+
+    prepare_output_paths(args.plot_file, args.hit_pars, args.aoe_results)
+
     kwarg_dict = Props.read_from(args.config_file)
     require_config_keys(kwarg_dict, ["run_aoe"], f"aoe config ({args.config_file})")
 
@@ -453,6 +481,9 @@ def par_geds_hit_aoe() -> None:
 
         override_dict = None
         if args.override_files:
+            if args.detector is None:
+                msg = "--detector is required when --override-files is given"
+                raise ValueError(msg)
             override_dict = Props.read_from(args.override_files)
             override_dict = override_dict.get(args.detector, None)
 
@@ -468,18 +499,16 @@ def par_geds_hit_aoe() -> None:
         )
         cal_dict = cal_dict[args.timestamp]
         results_dict = results_dicts[args.timestamp]
-        aoe = object_dicts[args.timestamp]
+        aoe = object_dicts[args.timestamp]["aoe"]
         plot_dict = plot_dicts[args.timestamp]
     else:
-        aoe = None
+        aoe = {}
         plot_dict = out_plot_dict
         results_dict = {}
     if args.plot_file:
-        Path(args.plot_file).parent.mkdir(parents=True, exist_ok=True)
         with Path(args.plot_file).open("wb") as w:
             pkl.dump(plot_dict, w, protocol=pkl.HIGHEST_PROTOCOL)
 
-    Path(args.hit_pars).parent.mkdir(parents=True, exist_ok=True)
     final_hit_dict = {
         "pars": {"operations": cal_dict},
         "results": results_dict,
@@ -489,6 +518,5 @@ def par_geds_hit_aoe() -> None:
 
     Props.write_to(args.hit_pars, final_hit_dict)
 
-    Path(args.aoe_results).parent.mkdir(parents=True, exist_ok=True)
     with Path(args.aoe_results).open("wb") as w:
         pkl.dump(dict(**object_dict, aoe=aoe), w, protocol=pkl.HIGHEST_PROTOCOL)

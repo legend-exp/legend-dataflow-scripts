@@ -1,16 +1,48 @@
 from __future__ import annotations
 
 import argparse
-import json
 import time
-from pathlib import Path
 
 import lh5
-from dbetto import TextDB
+import numpy as np
 from dbetto.catalog import Props
 from pygama.hit.build_hit import build_hit
 
-from ..utils import alias_table, build_log
+from ..utils import (
+    alias_table,
+    build_log,
+    check_input_files,
+    get_rule_config,
+    parse_json_arg,
+    prepare_output_paths,
+)
+
+
+def _cast_op_params_f32(hit_cfg: dict) -> dict:
+    """Cast float operation parameters to float32, in place.
+
+    Calibration parameters load from the pars YAML as python (64-bit)
+    floats, and ``Table.eval``/numexpr promotes ``float32-array x
+    float64-scalar`` to float64 — making every derived hit column float64
+    even when the DSP inputs are float32.  YAML cannot express float32, so
+    the cast has to happen here, after loading.  Operations whose
+    expressions reference genuine float64 columns (e.g. ``timestamp``)
+    still promote to float64, which is correct.
+    """
+
+    def cast(v):
+        if isinstance(v, float):
+            return np.float32(v)
+        if isinstance(v, list):
+            return [cast(x) for x in v]
+        return v
+
+    for info in hit_cfg.get("operations", {}).values():
+        pars = info.get("parameters")
+        if isinstance(pars, dict):
+            for key, val in pars.items():
+                pars[key] = cast(val)
+    return hit_cfg
 
 
 def build_tier_hit() -> None:
@@ -65,15 +97,20 @@ def build_tier_hit() -> None:
     argparser.add_argument("--output")
     args = argparser.parse_args()
 
-    table_map = json.loads(args.table_map)
-
-    df_config = (
-        TextDB(args.configs, lazy=True)
-        .on(args.timestamp, system=args.datatype)
-        .snakemake_rules[f"tier_{args.tier}"]
+    df_config = get_rule_config(
+        args.configs, f"tier_{args.tier}", args.timestamp, args.datatype
     )
     log = build_log(df_config, args.log, fallback=__name__)
     log.info("initializing")
+
+    table_map = parse_json_arg(args.table_map, "--table-map")
+    alias_map = (
+        parse_json_arg(args.alias_table, "--alias-table")
+        if args.alias_table is not None
+        else None
+    )
+    check_input_files(args.input, "--input")
+    prepare_output_paths(args.output)
 
     settings_dict = df_config.options.get("settings", {})
 
@@ -97,6 +134,7 @@ def build_tier_hit() -> None:
 
         # get pars (to override hit config)
         hit_cfg = Props.add_to(hit_cfg, pars_dict.get(chan, {}).copy())
+        hit_cfg = _cast_op_params_f32(hit_cfg)
 
         if chan not in table_map:
             continue
@@ -111,13 +149,12 @@ def build_tier_hit() -> None:
 
     log.info("running build_hit()...")
     start = time.time()
-    Path(args.output).parent.mkdir(parents=True, exist_ok=True)
     build_hit(args.input, lh5_tables_config=channel_dict, outfile=args.output)
     msg = f"Hit built in {time.time() - start:.2f} seconds"
     log.info(msg)
-    if args.alias_table is not None:
+    if alias_map is not None:
         log.info("Creating alias table")
-        alias_table(args.output, args.alias_table)
+        alias_table(args.output, alias_map)
 
 
 def build_tier_hit_single_channel() -> None:
@@ -171,13 +208,14 @@ def build_tier_hit_single_channel() -> None:
     argparser.add_argument("--output")
     args = argparser.parse_args()
 
-    df_config = (
-        TextDB(args.configs, lazy=True)
-        .on(args.timestamp, system=args.datatype)
-        .snakemake_rules[f"tier_{args.tier}"]
+    df_config = get_rule_config(
+        args.configs, f"tier_{args.tier}", args.timestamp, args.datatype
     )
     log = build_log(df_config, args.log, fallback=__name__)
     log.info("initializing")
+
+    check_input_files(args.input, "--input")
+    prepare_output_paths(args.output)
 
     settings_dict = df_config.options.get("settings", {})
 
@@ -200,10 +238,10 @@ def build_tier_hit_single_channel() -> None:
 
     hit_cfg = Props.read_from(chan_cfg_map)
     hit_cfg = Props.add_to(hit_cfg, pars_dict.copy())
+    hit_cfg = _cast_op_params_f32(hit_cfg)
 
     log.info("running build_hit()...")
     start = time.time()
-    Path(args.output).parent.mkdir(parents=True, exist_ok=True)
     build_hit(args.input, hit_config=hit_cfg, outfile=args.output)
     msg = f"Hit built in {time.time() - start:.2f} seconds"
     log.info(msg)

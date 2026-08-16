@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+import inspect
 import pickle as pkl
 import warnings
 from datetime import datetime
@@ -27,6 +28,7 @@ from ....utils import (
     convert_dict_np_to_float,
     expand_filelist,
     get_pulser_mask,
+    prepare_output_paths,
     require_config_keys,
 )
 
@@ -757,7 +759,11 @@ def par_geds_hit_ecal() -> None:
     ``--log-config`` : str, optional
         Logging configuration file.
     ``--config-file`` : list of str
-        Energy calibration configuration file(s).
+        Energy calibration configuration file(s).  Optional key
+        ``use_log_pdf`` (bool, default false): build the unbinned peak fits
+        from the model's log-density (iminuit ``log=True``) — substantially
+        faster, results differ at machine-precision level; requires a pygama
+        version with ``use_log_pdf`` support (silently ignored otherwise).
     ``--det-status`` : str
         Detector status (``"on"`` or other); affects peak-finding tolerances.
         Defaults to ``"on"``.
@@ -812,6 +818,8 @@ def par_geds_hit_ecal() -> None:
 
     log = build_log(args.log_config, args.log)
 
+    prepare_output_paths(args.plot_path, args.save_path, args.results_path)
+
     hit_dict = {}
     in_results_dict = {}
     if args.in_hit_dict:
@@ -821,15 +829,26 @@ def par_geds_hit_ecal() -> None:
 
     db_files = [
         par_file
-        for par_file in args.ctc_dict
+        for par_file in (args.ctc_dict or [])
         if Path(par_file).suffix in (".json", ".yml", ".yaml")
     ]
+    if args.ctc_dict and not db_files:
+        msg = (
+            f"--ctc-dict: none of the provided files {args.ctc_dict} has a "
+            ".json/.yml/.yaml extension"
+        )
+        raise ValueError(msg)
 
     database_dic = Props.read_from(db_files)
 
     if args.channel and args.channel in database_dic:
         database_dic = database_dic[args.channel]
 
+    require_config_keys(
+        database_dic,
+        ["ctc_params"],
+        f"ctc dict for channel {args.channel} ({args.ctc_dict})",
+    )
     hit_dict.update(database_dic["ctc_params"])
 
     kwarg_dict = Props.read_from(args.config_file)
@@ -904,6 +923,20 @@ def par_geds_hit_ecal() -> None:
         cal_energy_params = kwarg_dict["cal_energy_params"]
 
     selection_string = f"~is_pulser&{kwarg_dict['cut_param']}"
+
+    # opt-in: build the unbinned peak fits from the model's log-density
+    # (iminuit log=True mode) — much faster on large samples, results differ
+    # at machine-precision level. Needs a pygama version with use_log_pdf
+    # support; fall back silently on older versions.
+    use_log_pdf = kwarg_dict.get("use_log_pdf", False)
+    if (
+        use_log_pdf
+        and "use_log_pdf"
+        not in inspect.signature(HPGeCalibration.hpge_fit_energy_peaks).parameters
+    ):
+        log.warning("installed pygama does not support use_log_pdf, ignoring")
+        use_log_pdf = False
+    fit_kwargs = {"use_log_pdf": True} if use_log_pdf else {}
 
     results_dict = {}
     plot_dict = {}
@@ -982,6 +1015,7 @@ def par_geds_hit_ecal() -> None:
             allowed_p_val=kwarg_dict.get("p_val", 0),
             update_cal_pars=bool(args.det_status == "on"),
             bin_width_kev=0.5,
+            **fit_kwargs,
         )
         full_object_dict[cal_energy_param].hpge_fit_energy_peaks(
             e_uncal,
@@ -992,6 +1026,7 @@ def par_geds_hit_ecal() -> None:
             allowed_p_val=kwarg_dict.get("p_val", 0),
             update_cal_pars=kwarg_dict.get("use_all_peaks", False),
             bin_width_kev=0.5,
+            **fit_kwargs,
         )
 
         full_object_dict[cal_energy_param].get_energy_res_curve(
@@ -1146,7 +1181,6 @@ def par_geds_hit_ecal() -> None:
 
         total_plot_dict.update({"ecal": plot_dict})
 
-        Path(args.plot_path).parent.mkdir(parents=True, exist_ok=True)
         with Path(args.plot_path).open("wb") as f:
             pkl.dump(total_plot_dict, f, protocol=pkl.HIGHEST_PROTOCOL)
 
@@ -1158,5 +1192,4 @@ def par_geds_hit_ecal() -> None:
 
     # save calibration objects
     with Path(args.results_path).open("wb") as fp:
-        Path(args.results_path).parent.mkdir(parents=True, exist_ok=True)
         pkl.dump({"ecal": full_object_dict}, fp, protocol=pkl.HIGHEST_PROTOCOL)

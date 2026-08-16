@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
+from pathlib import Path
 
 from dbetto import TextDB
 
@@ -74,6 +75,59 @@ def require_config_keys(config: Mapping, keys: Iterable[str], context: str) -> N
         raise ValueError(msg)
 
 
+def require_peaks_present(
+    available: Iterable, required: Iterable, context: str
+) -> None:
+    """Raise ValueError listing all ``required`` peaks absent from ``available``.
+
+    The peak files written by ``par-geds-dsp-evtsel`` tag every row with the
+    nominal gamma-line energy in a ``peak`` column, so a peak for which no
+    events were selected is simply absent rather than empty.  Consumers filter
+    on that column and would otherwise operate silently on zero rows.
+
+    Parameters
+    ----------
+    available : iterable
+        Peak labels actually present in the peak file.
+    required : iterable
+        Peak labels the consumer's configuration asks for.
+    context : str
+        Free-form string naming the peak file and requesting config in the
+        error message.
+    """
+    present = set(available)
+    missing = sorted({peak for peak in required if peak not in present})
+    if missing:
+        msg = f"{context} is missing required peak(s) {missing}"
+        raise ValueError(msg)
+
+
+def require_unique_suffixes(params: Mapping, context: str) -> None:
+    """Raise ValueError when ``params`` entries share an output suffix.
+
+    Multi-parameter calibration configs derive their output column and
+    cal-dict names from each entry's optional ``suffix``; two entries with
+    the same suffix (including two entries with no suffix at all) would
+    silently overwrite each other's results.
+
+    Parameters
+    ----------
+    params : collections.abc.Mapping
+        The ``params`` mapping of a multi-parameter calibration config.
+    context : str
+        Free-form string naming the config in the error message.
+    """
+    suffixes = [entry.get("suffix") for entry in params.values()]
+    duplicated = {s for s in suffixes if suffixes.count(s) > 1}
+    if duplicated:
+        labels = sorted("<no suffix>" if s is None else repr(s) for s in duplicated)
+        msg = (
+            f"{context}: params entries share the same suffix value(s) "
+            f"({', '.join(labels)}); their outputs would overwrite each other"
+        )
+        raise ValueError(msg)
+
+
 def get_rule_config(configs_path, rule_name, timestamp, datatype):
     """Resolve the dataflow config for one Snakemake rule.
 
@@ -81,6 +135,9 @@ def get_rule_config(configs_path, rule_name, timestamp, datatype):
     missing key names the rule, timestamp, datatype and config path instead
     of raising a bare :class:`KeyError`.
     """
+    if not Path(configs_path).is_dir():
+        msg = f"config directory {configs_path} does not exist"
+        raise FileNotFoundError(msg)
     configs = TextDB(configs_path, lazy=True).on(timestamp, category=datatype)
     try:
         return configs["snakemake_rules"][rule_name]

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+import inspect
 import logging
 import pickle as pkl
 import time
@@ -24,7 +25,9 @@ from ....utils import (
     expand_filelist,
     fill_plot_dict,
     get_pulser_mask,
+    prepare_output_paths,
     require_config_keys,
+    require_unique_suffixes,
 )
 
 log = logging.getLogger(__name__)
@@ -64,22 +67,25 @@ def lq_calibration(
     dt_param: str,
     eres_func: callable,
     cdf: callable = gaussian,
+    lq_param: str = "lq80",
     selection_string: str = "",
     plot_options: dict | None = None,
     debug_mode: bool = False,
+    use_log_pdf: bool = False,
+    suffix: str | None = None,
 ):
     """Calibrate the LQ (late-charge) pulse-shape discriminant.
 
     Constructs a :class:`~pygama.pargen.lq_cal.LQCal` instance, computes the
-    energy-normalised LQ observable ``LQ_Ecorr = lq80 / energy_param``, and
+    energy-normalised LQ observable ``LQ_Ecorr = lq_param / energy_param``, and
     calls :meth:`~pygama.pargen.lq_cal.LQCal.calibrate`.  The resulting cut
     expressions are appended to *cal_dicts*.
 
     Parameters
     ----------
     data : pandas.DataFrame
-        Event-level data containing ``lq80``, *energy_param*, *cal_energy_param*,
-        *dt_param*, and any selection columns.
+        Event-level data containing *lq_param*, *energy_param*,
+        *cal_energy_param*, *dt_param*, and any selection columns.
     cal_dicts : dict
         Mapping of run timestamps → hit-level calibration operations.
         Updated in-place with the LQ cut expression.
@@ -94,6 +100,8 @@ def lq_calibration(
     cdf : callable
         Cumulative distribution function used for binned LQ fitting.
         Defaults to :func:`pygama.math.distributions.gaussian`.
+    lq_param : str
+        Raw LQ parameter name to calibrate.  Defaults to ``"lq80"``.
     selection_string : str
         Pandas query string applied before calibration.  Defaults to ``""``.
     plot_options : dict, optional
@@ -101,6 +109,17 @@ def lq_calibration(
         passed to :func:`~legenddataflowscripts.utils.fill_plot_dict`.
     debug_mode : bool
         Activates additional diagnostic output.  Defaults to ``False``.
+    use_log_pdf : bool
+        Build the survival-fraction unbinned NLL fits from the models'
+        log-densities (iminuit ``log=True`` mode) — faster, results differ
+        at machine-precision level.  Silently ignored when the installed
+        pygama does not support it.
+    suffix : str, optional
+        Appended (underscore-separated) to all output parameter names, e.g.
+        ``suffix="foo"`` produces ``LQ_Ecorr_foo`` … ``LQ_Cut_foo``.  Lets
+        several LQ parameters be calibrated side by side without their
+        hit-level operations colliding.  Requires a pygama version whose
+        :meth:`~pygama.pargen.lq_cal.LQCal.calibrate` supports ``suffix``.
 
     Returns
     -------
@@ -114,6 +133,10 @@ def lq_calibration(
         Calibrated LQ object.
     """
 
+    if use_log_pdf and "use_log_pdf" not in inspect.signature(LQCal).parameters:
+        log.warning("installed pygama does not support use_log_pdf, ignoring")
+        use_log_pdf = False
+
     lq = LQCal(
         cal_dicts,
         cal_energy_param,
@@ -122,20 +145,22 @@ def lq_calibration(
         cdf,
         selection_string,
         debug_mode=debug_mode,
+        **({"use_log_pdf": True} if use_log_pdf else {}),
     )
 
-    data["LQ_Ecorr"] = np.divide(data["lq80"], data[energy_param])
+    initial_param = "LQ_Ecorr" if suffix is None else f"LQ_Ecorr_{suffix}"
+    data[initial_param] = np.divide(data[lq_param], data[energy_param])
 
     lq.update_cal_dicts(
         {
-            "LQ_Ecorr": {
-                "expression": f"lq80/{energy_param}",
+            initial_param: {
+                "expression": f"{lq_param}/{energy_param}",
                 "parameters": {},
             }
         }
     )
 
-    lq.calibrate(data, "LQ_Ecorr")
+    lq.calibrate(data, initial_param, **({} if suffix is None else {"suffix": suffix}))
     return cal_dicts, get_results_dict(lq), fill_plot_dict(lq, data, plot_options), lq
 
 
@@ -171,8 +196,17 @@ def run_lq_calibration(
         ``{timestamp: plot_dict}`` mapping of existing diagnostic figures.
     configs : dict or str or list
         LQ calibration configuration.  Must contain ``run_lq`` (bool),
-        ``energy_param``, ``cal_energy_param``, ``cut_field``, and
-        ``dt_param``.
+        ``cal_energy_param``, ``cut_field``, and ``params`` — a mapping of
+        ``{name: param_config}`` with one entry per LQ parameter to
+        calibrate.  Each *param_config* must contain ``lq_param`` and
+        ``energy_param``; optional keys are ``dt_param`` (default
+        ``"dt_eff"``), ``cdf``, ``suffix`` (appended to the output parameter
+        names so entries don't collide), and ``plot_options``.  Optional
+        top-level key ``use_log_pdf`` (bool, default false): build the
+        survival-fraction unbinned fits from the models' log-densities
+        (iminuit ``log=True``) — substantially faster, results differ at
+        machine-precision level; requires a pygama version with
+        ``use_log_pdf`` support (silently ignored otherwise).
     debug_mode : bool
         Activates additional diagnostic output.  Defaults to ``False``.
 
@@ -181,27 +215,30 @@ def run_lq_calibration(
     cal_dicts : dict
         Updated calibration operations mappings.
     out_result_dicts : dict
-        Updated results mappings including LQ results.
+        Updated results mappings; LQ results are nested per ``params`` entry
+        under the ``lq`` key.
     out_object_dicts : dict
-        Updated object mappings including the ``LQCal`` instance.
+        Updated object mappings including one ``LQCal`` instance per
+        ``params`` entry.
     out_plot_dicts : dict
-        Updated plot mappings including LQ diagnostic figures.
+        Updated plot mappings including LQ diagnostic figures per ``params``
+        entry.
     """
     if isinstance(configs, str | list):
         configs = Props.read_from(configs)
 
     require_config_keys(configs, ["run_lq"], "lq calibration config")
 
-    if configs.pop("run_lq") is True:
+    if configs["run_lq"] is True:
         require_config_keys(
             configs,
-            ["energy_param", "cal_energy_param", "dt_param", "cut_field"],
+            ["cal_energy_param", "cut_field", "params"],
             "lq calibration config",
         )
-        if "plot_options" in configs:
-            for field, item in configs["plot_options"].items():
-                configs["plot_options"][field]["function"] = eval(item["function"])
-
+        require_unique_suffixes(configs["params"], "lq calibration config")
+        lq_objs = {}
+        lq_plot_dict = {}
+        out_dicts = {}
         try:
             eres = copy.deepcopy(
                 results_dicts[next(iter(results_dicts))]["partition_ecal"][
@@ -230,45 +267,60 @@ def run_lq_calibration(
                 def eres_func(x):
                     return x * np.nan
 
-        log.info("starting lq calibration")
-        start = time.time()
-        cal_dicts, out_dict, lq_plot_dict, lq_obj = lq_calibration(
-            data,
-            cal_dicts=cal_dicts,
-            energy_param=configs["energy_param"],
-            cal_energy_param=configs["cal_energy_param"],
-            dt_param=configs["dt_param"],
-            eres_func=eres_func,
-            cdf=eval(configs.get("cdf", "gaussian")),
-            selection_string=f"{configs.pop('cut_field')}&(~is_pulser)",
-            plot_options=configs.get("plot_options", None),
-            debug_mode=debug_mode | configs.get("debug_mode", False),
-        )
-        msg = f"lq calibration took {time.time() - start:.2f} seconds"
-        log.info(msg)
-        # need to change eres func as can't pickle lambdas
-        try:
-            lq_obj.eres_func = results_dicts[next(iter(results_dicts))][
-                "partition_ecal"
-            ][configs["cal_energy_param"]]["eres_linear"]
-        except KeyError:
-            lq_obj.eres_func = {}
-    else:
-        out_dict = dict.fromkeys(cal_dicts)
-        lq_plot_dict = {}
-        lq_obj = None
+        for name, param_config in configs["params"].items():
+            require_config_keys(
+                param_config,
+                ["lq_param", "energy_param"],
+                f"lq calibration config params entry '{name}'",
+            )
+            if "plot_options" in param_config:
+                for field, item in param_config["plot_options"].items():
+                    param_config["plot_options"][field]["function"] = eval(
+                        item["function"]
+                    )
 
-    # mirror the aoe result shape: one (shared) lq results entry per timestamp
-    if not isinstance(out_dict, dict) or set(out_dict) != set(cal_dicts):
-        out_dict = dict.fromkeys(cal_dicts, out_dict)
+            msg = f"starting lq calibration for {name}"
+            log.info(msg)
+            start = time.time()
+            cal_dicts, out_dict, lq_plots, lq_obj = lq_calibration(
+                data,
+                cal_dicts=cal_dicts,
+                energy_param=param_config["energy_param"],
+                cal_energy_param=configs["cal_energy_param"],
+                dt_param=param_config.get("dt_param", "dt_eff"),
+                eres_func=eres_func,
+                cdf=eval(param_config.get("cdf", "gaussian")),
+                lq_param=param_config["lq_param"],
+                selection_string=f"{configs['cut_field']}&(~is_pulser)",
+                plot_options=param_config.get("plot_options", None),
+                debug_mode=debug_mode | configs.get("debug_mode", False),
+                use_log_pdf=configs.get("use_log_pdf", False),
+                suffix=param_config.get("suffix", None),
+            )
+            msg = f"lq calibration for {name} took {time.time() - start:.2f} seconds"
+            log.info(msg)
+            # need to change eres func as can't pickle lambdas
+            try:
+                lq_obj.eres_func = results_dicts[next(iter(results_dicts))][
+                    "partition_ecal"
+                ][configs["cal_energy_param"]]["eres_linear"]
+            except KeyError:
+                lq_obj.eres_func = {}
+            out_dicts[name] = out_dict
+            lq_objs[name] = copy.deepcopy(lq_obj)
+            lq_plot_dict[name] = copy.deepcopy(lq_plots)
+    else:
+        out_dicts = {}
+        lq_objs = {}
+        lq_plot_dict = {}
 
     out_result_dicts = {}
     for tstamp, result_dict in results_dicts.items():
-        out_result_dicts[tstamp] = dict(**result_dict, lq=out_dict[tstamp])
+        out_result_dicts[tstamp] = dict(**result_dict, lq=dict(out_dicts))
 
     out_object_dicts = {}
     for tstamp, object_dict in object_dicts.items():
-        out_object_dicts[tstamp] = dict(**object_dict, lq=lq_obj)
+        out_object_dicts[tstamp] = dict(**object_dict, lq=lq_objs)
 
     common_dict = lq_plot_dict.pop("common") if "common" in list(lq_plot_dict) else None
     out_plot_dicts = {}
@@ -317,8 +369,9 @@ def par_geds_hit_lq() -> None:
         Logging configuration file.
     ``--config-file`` : list of str
         LQ calibration configuration file(s).  Must contain ``run_lq``
-        (bool), ``energy_param``, ``cal_energy_param``, ``cut_field``,
-        ``dt_param``, and ``threshold``.
+        (bool), ``cal_energy_param``, ``cut_field``, ``threshold``, and
+        ``params`` — one entry per LQ parameter to calibrate (see
+        :func:`run_lq_calibration`).
     ``--table-name`` : str
         LH5 table path within the DSP files.
     ``--timestamp`` : str
@@ -371,6 +424,9 @@ def par_geds_hit_lq() -> None:
     args = argparser.parse_args()
 
     build_log(args.log_config, args.log)
+
+    prepare_output_paths(args.plot_file, args.hit_pars, args.lq_results)
+
     kwarg_dict = Props.read_from(args.config_file)
     require_config_keys(kwarg_dict, ["run_lq"], f"lq config ({args.config_file})")
 
@@ -390,18 +446,25 @@ def par_geds_hit_lq() -> None:
     if kwarg_dict["run_lq"] is True:
         require_config_keys(
             kwarg_dict,
-            ["energy_param", "cal_energy_param", "cut_field", "threshold"],
+            ["cal_energy_param", "cut_field", "threshold", "params"],
             f"lq config ({args.config_file})",
         )
         files = expand_filelist(args.files)
 
         params = [
-            "lq80",
-            "dt_eff",
-            kwarg_dict["energy_param"],
             kwarg_dict["cal_energy_param"],
             kwarg_dict["cut_field"],
         ]
+        for name, param_config in kwarg_dict["params"].items():
+            require_config_keys(
+                param_config,
+                ["lq_param", "energy_param"],
+                f"lq config params entry '{name}' ({args.config_file})",
+            )
+            params.append(param_config["lq_param"])
+            params.append(param_config["energy_param"])
+            params.append(param_config.get("dt_param", "dt_eff"))
+        params = list(dict.fromkeys(params))
 
         # load data in
         data, threshold_mask = load_data(
@@ -409,7 +472,7 @@ def par_geds_hit_lq() -> None:
             args.table_name,
             cal_dict,
             params=params,
-            threshold=kwarg_dict.pop("threshold"),
+            threshold=kwarg_dict["threshold"],
             return_selection_mask=True,
         )
 
@@ -443,14 +506,13 @@ def par_geds_hit_lq() -> None:
         cal_dict = out_dicts[args.timestamp]
         results_dict = results_dicts[args.timestamp]
         plot_dict = plot_dicts[args.timestamp]
-        lq = lq_dict[args.timestamp]
+        lq = lq_dict[args.timestamp]["lq"]
 
     else:
-        lq = None
+        lq = {}
         results_dict = {}
 
     if args.plot_file:
-        Path(args.plot_file).parent.mkdir(parents=True, exist_ok=True)
         with Path(args.plot_file).open("wb") as w:
             pkl.dump(plot_dict, w, protocol=pkl.HIGHEST_PROTOCOL)
 
@@ -460,13 +522,11 @@ def par_geds_hit_lq() -> None:
             "results": results_dict,
         }
     )
-    Path(args.hit_pars).parent.mkdir(parents=True, exist_ok=True)
     Props.write_to(args.hit_pars, final_hit_dict)
 
     final_object_dict = dict(
         **object_dict,
         lq=lq,
     )
-    Path(args.lq_results).parent.mkdir(parents=True, exist_ok=True)
     with Path(args.lq_results).open("wb") as w:
         pkl.dump(final_object_dict, w, protocol=pkl.HIGHEST_PROTOCOL)

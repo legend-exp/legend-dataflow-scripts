@@ -21,6 +21,8 @@ from ....utils import (
     build_log,
     check_pulser_mask,
     expand_filelist,
+    get_channel_config,
+    get_is_recovering_mask,
     get_pulser_mask,
     require_config_keys,
 )
@@ -125,10 +127,56 @@ def get_out_data(
             "trapTmax_cal": lgdo.Array(
                 dsp_data["trapTmax"].nda[final_mask] * ecal_pars
             ),
-            "peak": lgdo.Array(np.full(len(np.where(final_mask)[0]), int(peak))),
+            "peak": lgdo.Array(np.full(int(np.count_nonzero(final_mask)), int(peak))),
         }
     )
-    return out_tbl, len(np.where(final_mask)[0])
+    return out_tbl, int(np.count_nonzero(final_mask))
+
+
+def build_peak_dicts(peaks_kev, kev_widths, masks, log=None):
+    """Build the per-peak accumulator state for the file x peak read loop.
+
+    Peaks for which *masks* holds no candidate event are dropped: with an
+    empty index array nothing is ever read into the peak's buffer, and the
+    end-of-file flush would then hand ``None`` to
+    :func:`dspeed.build_dsp`.  This happens for channels whose DAQ trigger
+    threshold sits above a configured gamma line.
+
+    Parameters
+    ----------
+    peaks_kev : sequence of float
+        Nominal gamma-line energies in keV.
+    kev_widths : sequence of (float, float)
+        Lower/upper selection widths in keV, one pair per peak.
+    masks : dict
+        Mapping of peak energy to the array of candidate event indices.
+    log : logging.Logger, optional
+        Logger used to warn about skipped peaks.
+
+    Returns
+    -------
+    dict
+        Mapping of peak energy to its accumulator state, with peaks that have
+        no candidate events omitted.
+    """
+    pk_dicts = {}
+    for peak, kev_width in zip(peaks_kev, kev_widths, strict=False):
+        if len(masks[peak]) == 0:
+            if log is not None:
+                msg = (
+                    f"no events in the rough energy range for {peak}, "
+                    "skipping this peak"
+                )
+                log.warning(msg)
+            continue
+        pk_dicts[peak] = {
+            "idxs": (masks[peak],),
+            "n_rows_read": 0,
+            "obj_buf_start": 0,
+            "obj_buf": None,
+            "kev_width": kev_width,
+        }
+    return pk_dicts
 
 
 def par_geds_dsp_evtsel() -> None:
@@ -280,21 +328,16 @@ def par_geds_dsp_evtsel() -> None:
 
         discharges = tb["t_sat_lo"].nda > 0
         discharge_timestamps = np.where(tb["timestamp"].nda[discharges])[0]
-        is_recovering = np.full(len(tb), False, dtype=bool)
-        for tstamp in discharge_timestamps:
-            is_recovering = is_recovering | np.where(
-                (
-                    ((tb["timestamp"].nda - tstamp) < 0.01)
-                    & ((tb["timestamp"].nda - tstamp) > 0)
-                ),
-                True,
-                False,
-            )
+        is_recovering = get_is_recovering_mask(
+            tb["timestamp"].nda, discharge_timestamps
+        )
 
         if args.raw_cal_curve:
-            raw_dict = Props.read_from(args.raw_cal_curve)[args.channel]["pars"][
-                "operations"
-            ]
+            raw_dict = get_channel_config(
+                Props.read_from(args.raw_cal_curve),
+                args.channel,
+                name="--raw-cal-curve",
+            )["pars"]["operations"]
         else:
             E_uncal = tb[energy_field].nda
             E_uncal = E_uncal[E_uncal > 200]
@@ -339,6 +382,10 @@ def par_geds_dsp_evtsel() -> None:
         input_data = lh5.read(
             f"{lh5_path}", raw_files, n_rows=10000, idx=np.where(~mask)[0]
         )
+        # the all-events scalar table and its derived masks are no longer
+        # needed; free them before the per-peak waveform buffers accumulate
+        del tb, rough_energy, e_mask, mask, is_recovering, discharges
+        del discharge_timestamps
 
         if isinstance(dsp_config, str):
             dsp_config = Props.read_from(dsp_config)
@@ -357,23 +404,19 @@ def par_geds_dsp_evtsel() -> None:
             log.debug(msg)
         else:
             cut_dict = None
+        # free the cut-derivation waveform buffer and its DSP output — they
+        # would otherwise stay resident alongside every per-peak obj_buf for
+        # the whole file x peak loop below
+        del input_data, tb_data
 
-        pk_dicts = {}
-        for peak, kev_width in zip(peaks_kev, kev_widths, strict=False):
-            pk_dicts[peak] = {
-                "idxs": (masks[peak],),
-                "n_rows_read": 0,
-                "obj_buf_start": 0,
-                "obj_buf": None,
-                "kev_width": kev_width,
-            }
+        pk_dicts = build_peak_dicts(peaks_kev, kev_widths, masks, log=log)
 
         for file in raw_files:
             log.debug(Path(file).name)
+            # idx is a long continuous array
+            n_rows_i = sto.read_n_rows(lh5_path, file)
             for peak, peak_dict in pk_dicts.items():
                 if peak_dict["idxs"] is not None:
-                    # idx is a long continuous array
-                    n_rows_i = sto.read_n_rows(lh5_path, file)
                     # find the length of the subset of idx that contains indices
                     # that are less than n_rows_i
                     n_rows_to_read_i = bisect_left(peak_dict["idxs"][0], n_rows_i)
@@ -398,7 +441,13 @@ def par_geds_dsp_evtsel() -> None:
                         log.debug(msg)
                         peak_dict["obj_buf_start"] += n_rows_read_i
                     if peak_dict["n_rows_read"] >= 10000 or file == raw_files[-1]:
-                        if "e_lower_lim" not in peak_dict:
+                        if (
+                            peak_dict["obj_buf"] is None
+                            or len(peak_dict["obj_buf"]) == 0
+                        ):
+                            # nothing accumulated for this peak yet, nothing to flush
+                            pass
+                        elif "e_lower_lim" not in peak_dict:
                             tb_out = build_dsp(
                                 raw_in=peak_dict["obj_buf"],
                                 dsp_config=dsp_config,
@@ -496,10 +545,7 @@ def par_geds_dsp_evtsel() -> None:
                             peak_dict["n_events"] = n_wfs
                             msg = f"found {peak_dict['n_events']} events for {peak}"
                             log.debug(msg)
-                        elif (
-                            peak_dict["obj_buf"] is not None
-                            and len(peak_dict["obj_buf"]) > 0
-                        ):
+                        else:
                             tb_out = build_dsp(
                                 raw_in=peak_dict["obj_buf"],
                                 dsp_config=dsp_config,

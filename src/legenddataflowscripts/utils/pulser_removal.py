@@ -23,16 +23,15 @@ def get_pulser_mask(pulser_file):
     """
     if not isinstance(pulser_file, list):
         pulser_file = [pulser_file]
-    mask = np.array([], dtype=bool)
+    masks = [np.array([], dtype=bool)]
     for file in pulser_file:
         pulser_dict = Props.read_from(file)
         if "mask" not in pulser_dict:
             msg = f"pulser file {file} does not contain a 'mask' key"
             raise KeyError(msg)
-        pulser_mask = np.array(pulser_dict["mask"])
-        mask = np.append(mask, pulser_mask)
+        masks.append(np.array(pulser_dict["mask"]))
 
-    return mask
+    return np.concatenate(masks)
 
 
 def check_pulser_mask(mask, threshold_mask, context) -> None:
