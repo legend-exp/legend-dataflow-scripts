@@ -8,7 +8,6 @@ import pickle as pkl
 import re
 import time
 import warnings
-from copy import deepcopy
 from pathlib import Path
 
 import numpy as np
@@ -26,6 +25,7 @@ from ....utils import (
     get_pulser_mask,
     prepare_output_paths,
     require_config_keys,
+    require_unique_suffixes,
 )
 
 log = logging.getLogger(__name__)
@@ -148,6 +148,7 @@ def run_aoe_calibration(
             ["cal_energy_param", "cut_field", "params"],
             "aoe calibration config",
         )
+        require_unique_suffixes(config["params"], "aoe calibration config")
         aoe_objs = {}
         aoe_plot_dict = {}
         out_dicts = {}
@@ -237,7 +238,9 @@ def run_aoe_calibration(
                 dt_cut=param_config.get("dt_cut", None),
                 dt_param=param_config.get("dt_param", 3),
                 high_cut_val=param_config.get("high_cut_val", 3),
-                compt_bands_width=config.get("debug_mode", 20),
+                compt_bands_width=param_config.get(
+                    "compt_bands_width", config.get("compt_bands_width", 20)
+                ),
                 debug_mode=debug_mode | config.get("debug_mode", False),
                 **({"use_log_pdf": True} if use_log_pdf else {}),
             )

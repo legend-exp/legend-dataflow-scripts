@@ -102,6 +102,32 @@ def require_peaks_present(
         raise ValueError(msg)
 
 
+def require_unique_suffixes(params: Mapping, context: str) -> None:
+    """Raise ValueError when ``params`` entries share an output suffix.
+
+    Multi-parameter calibration configs derive their output column and
+    cal-dict names from each entry's optional ``suffix``; two entries with
+    the same suffix (including two entries with no suffix at all) would
+    silently overwrite each other's results.
+
+    Parameters
+    ----------
+    params : collections.abc.Mapping
+        The ``params`` mapping of a multi-parameter calibration config.
+    context : str
+        Free-form string naming the config in the error message.
+    """
+    suffixes = [entry.get("suffix") for entry in params.values()]
+    duplicated = {s for s in suffixes if suffixes.count(s) > 1}
+    if duplicated:
+        labels = sorted("<no suffix>" if s is None else repr(s) for s in duplicated)
+        msg = (
+            f"{context}: params entries share the same suffix value(s) "
+            f"({', '.join(labels)}); their outputs would overwrite each other"
+        )
+        raise ValueError(msg)
+
+
 def get_rule_config(configs_path, rule_name, timestamp, datatype):
     """Resolve the dataflow config for one Snakemake rule.
 

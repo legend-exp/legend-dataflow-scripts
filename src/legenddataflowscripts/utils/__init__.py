@@ -6,6 +6,7 @@ from .cfgtools import (
     get_rule_config,
     require_config_keys,
     require_peaks_present,
+    require_unique_suffixes,
 )
 from .convert_np import convert_dict_np_to_float
 from .discharge import get_is_recovering_mask
@@ -36,5 +37,6 @@ __all__ = [
     "prepare_output_paths",
     "require_config_keys",
     "require_peaks_present",
+    "require_unique_suffixes",
     "take_table_rows",
 ]

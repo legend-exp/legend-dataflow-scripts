@@ -22,6 +22,7 @@ from legenddataflowscripts.utils import (
     parse_json_arg,
     prepare_output_paths,
     require_config_keys,
+    require_unique_suffixes,
 )
 
 
@@ -211,3 +212,22 @@ def test_build_log_excepthook(tmp_path, monkeypatch):
     assert log_file.read_text().count("uncaught exception") == 1
 
     assert isinstance(log, logging.Logger)
+
+
+def test_require_unique_suffixes():
+    # distinct suffixes, and a single unsuffixed entry, are fine
+    require_unique_suffixes(
+        {"a": {"suffix": "low"}, "b": {"suffix": "high"}, "c": {}}, "test config"
+    )
+
+    # two entries with the same explicit suffix would overwrite each other
+    with pytest.raises(ValueError, match=r"test config: params entries share"):
+        require_unique_suffixes(
+            {"a": {"suffix": "low"}, "b": {"suffix": "low"}}, "test config"
+        )
+
+    # ... as would two entries that both omit the suffix
+    with pytest.raises(ValueError, match="<no suffix>"):
+        require_unique_suffixes(
+            {"a": {}, "b": {"current_param": "A_max"}}, "test config"
+        )

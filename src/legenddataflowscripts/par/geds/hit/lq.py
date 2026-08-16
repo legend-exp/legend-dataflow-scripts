@@ -27,6 +27,7 @@ from ....utils import (
     get_pulser_mask,
     prepare_output_paths,
     require_config_keys,
+    require_unique_suffixes,
 )
 
 log = logging.getLogger(__name__)
@@ -234,6 +235,7 @@ def run_lq_calibration(
             ["cal_energy_param", "cut_field", "params"],
             "lq calibration config",
         )
+        require_unique_suffixes(configs["params"], "lq calibration config")
         lq_objs = {}
         lq_plot_dict = {}
         out_dicts = {}
