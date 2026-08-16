@@ -24,6 +24,7 @@ from ....utils import (
     check_input_files,
     prepare_output_paths,
     require_config_keys,
+    require_peaks_present,
 )
 
 warnings.filterwarnings(action="ignore", category=RuntimeWarning)
@@ -181,6 +182,11 @@ def par_geds_dsp_eopt() -> None:
 
         peaks_rounded = [int(peak) for peak in peaks_kev]
         peaks = lh5.read_as(f"{args.raw_table_name}/peak", args.peak_file, library="np")
+        require_peaks_present(
+            np.unique(peaks),
+            peaks_rounded,
+            f"peak file {args.peak_file} requested by eopt config ({args.config_file})",
+        )
         ids = np.isin(peaks, peaks_rounded)
         peaks = peaks[ids]
         idx_list = [np.where(peaks == peak)[0] for peak in peaks_rounded]
