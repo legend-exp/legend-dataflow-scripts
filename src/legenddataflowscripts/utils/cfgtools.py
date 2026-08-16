@@ -75,6 +75,33 @@ def require_config_keys(config: Mapping, keys: Iterable[str], context: str) -> N
         raise ValueError(msg)
 
 
+def require_peaks_present(
+    available: Iterable, required: Iterable, context: str
+) -> None:
+    """Raise ValueError listing all ``required`` peaks absent from ``available``.
+
+    The peak files written by ``par-geds-dsp-evtsel`` tag every row with the
+    nominal gamma-line energy in a ``peak`` column, so a peak for which no
+    events were selected is simply absent rather than empty.  Consumers filter
+    on that column and would otherwise operate silently on zero rows.
+
+    Parameters
+    ----------
+    available : iterable
+        Peak labels actually present in the peak file.
+    required : iterable
+        Peak labels the consumer's configuration asks for.
+    context : str
+        Free-form string naming the peak file and requesting config in the
+        error message.
+    """
+    present = set(available)
+    missing = sorted({peak for peak in required if peak not in present})
+    if missing:
+        msg = f"{context} is missing required peak(s) {missing}"
+        raise ValueError(msg)
+
+
 def get_rule_config(configs_path, rule_name, timestamp, datatype):
     """Resolve the dataflow config for one Snakemake rule.
 
