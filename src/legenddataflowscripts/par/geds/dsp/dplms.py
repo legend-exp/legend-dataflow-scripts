@@ -21,6 +21,7 @@ from ....utils import (
     expand_filelist,
     prepare_output_paths,
     require_config_keys,
+    require_peaks_present,
     take_table_rows,
 )
 
@@ -152,6 +153,11 @@ def par_geds_dsp_dplms() -> None:
 
         peaks_rounded = [int(peak) for peak in peaks_kev]
         peaks = lh5.read_as(f"{args.raw_table_name}/peak", args.peak_file, library="np")
+        require_peaks_present(
+            np.unique(peaks),
+            peaks_rounded,
+            f"peak file {args.peak_file} requested by dplms config ({args.config_file})",
+        )
         ids = np.isin(peaks, peaks_rounded)
 
         raw_cal = lh5.read(args.raw_table_name, args.peak_file, idx=ids)

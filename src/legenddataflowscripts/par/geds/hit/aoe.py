@@ -8,6 +8,7 @@ import pickle as pkl
 import re
 import time
 import warnings
+from copy import deepcopy
 from pathlib import Path
 
 import numpy as np
