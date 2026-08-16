@@ -4,6 +4,7 @@ import argparse
 import time
 
 import lh5
+import numpy as np
 from dbetto.catalog import Props
 from pygama.hit.build_hit import build_hit
 
@@ -15,6 +16,33 @@ from ..utils import (
     parse_json_arg,
     prepare_output_paths,
 )
+
+
+def _cast_op_params_f32(hit_cfg: dict) -> dict:
+    """Cast float operation parameters to float32, in place.
+
+    Calibration parameters load from the pars YAML as python (64-bit)
+    floats, and ``Table.eval``/numexpr promotes ``float32-array x
+    float64-scalar`` to float64 — making every derived hit column float64
+    even when the DSP inputs are float32.  YAML cannot express float32, so
+    the cast has to happen here, after loading.  Operations whose
+    expressions reference genuine float64 columns (e.g. ``timestamp``)
+    still promote to float64, which is correct.
+    """
+
+    def cast(v):
+        if isinstance(v, float):
+            return np.float32(v)
+        if isinstance(v, list):
+            return [cast(x) for x in v]
+        return v
+
+    for info in hit_cfg.get("operations", {}).values():
+        pars = info.get("parameters")
+        if isinstance(pars, dict):
+            for key, val in pars.items():
+                pars[key] = cast(val)
+    return hit_cfg
 
 
 def build_tier_hit() -> None:
@@ -106,6 +134,7 @@ def build_tier_hit() -> None:
 
         # get pars (to override hit config)
         hit_cfg = Props.add_to(hit_cfg, pars_dict.get(chan, {}).copy())
+        hit_cfg = _cast_op_params_f32(hit_cfg)
 
         if chan not in table_map:
             continue
@@ -209,6 +238,7 @@ def build_tier_hit_single_channel() -> None:
 
     hit_cfg = Props.read_from(chan_cfg_map)
     hit_cfg = Props.add_to(hit_cfg, pars_dict.copy())
+    hit_cfg = _cast_op_params_f32(hit_cfg)
 
     log.info("running build_hit()...")
     start = time.time()
