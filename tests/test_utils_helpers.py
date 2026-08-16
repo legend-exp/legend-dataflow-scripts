@@ -180,6 +180,34 @@ def test_alias_table_membership(tmp_path):
         assert f["det"].attrs["datatype"] == "struct{raw_blind,raw,raw2}"
 
 
+def test_alias_table_annotated_root(tmp_path):
+    """Aliasing into a new top-level group of a file whose root is a struct."""
+    lh5_file = tmp_path / "test.lh5"
+    with h5py.File(lh5_file, "w") as f:
+        for rawid, det in (("ch1027200", "V02160A"), ("ch1027201", "V02162B")):
+            grp = f.create_group(f"{rawid}/dsp")
+            grp.attrs["datatype"] = "table{a}"
+            grp.create_dataset("a", data=[1, 2, 3])
+            f[rawid].attrs["datatype"] = "struct{dsp}"
+        # real LH5 files always carry a datatype on the root group; the parent
+        # walk must stop there instead of recursing on it forever
+        f["/"].attrs["datatype"] = "struct{ch1027200,ch1027201}"
+
+    alias_table(lh5_file, {"ch1027200/dsp": "dsp/V02160A"})
+
+    with h5py.File(lh5_file) as f:
+        assert f["/"].attrs["datatype"] == "struct{ch1027200,ch1027201,dsp}"
+        assert f["dsp"].attrs["datatype"] == "struct{V02160A}"
+        assert list(f["dsp/V02160A/a"]) == [1, 2, 3]
+
+    # a second alias extends the new group but leaves the root untouched
+    alias_table(lh5_file, {"ch1027201/dsp": "dsp/V02162B"})
+
+    with h5py.File(lh5_file) as f:
+        assert f["/"].attrs["datatype"] == "struct{ch1027200,ch1027201,dsp}"
+        assert f["dsp"].attrs["datatype"] == "struct{V02160A,V02162B}"
+
+
 def test_build_log_excepthook(tmp_path, monkeypatch):
     monkeypatch.setattr(sys, "stderr", sys.stderr)
     monkeypatch.setattr(sys, "excepthook", sys.excepthook)
