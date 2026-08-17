@@ -25,6 +25,17 @@ def _execenv2str(cmd_expr: Iterable, cmd_env: Mapping) -> str:
     return " ".join([f"{k}={v}" for k, v in cmd_env.items()]) + " " + " ".join(cmd_expr)
 
 
+def _uses_execenv(config: Mapping) -> bool:
+    """Return whether *config* defines a non-empty ``execenv`` section.
+
+    Production cycles managed by `pixi <https://pixi.sh>`_ omit the
+    ``execenv:`` block entirely: the software environment (including
+    container-image contents) is provided by the ambient pixi environment,
+    so no container prefix or virtualenv path handling is needed.
+    """
+    return bool(config.get("execenv"))
+
+
 def apptainer_env_vars(cmdenv: Mapping) -> list[str]:
     return [f"--env={var}={val}" for var, val in cmdenv.items()]
 
@@ -69,9 +80,15 @@ def execenv_prefix(
 
     Note
     ----
-    If *as_string* is ``True``, a space is appended to the returned string.
+    If *as_string* is ``True``, a space is appended to the returned (non-empty)
+    string. When *config* has no (non-empty) ``execenv`` section — i.e. the
+    cycle's software environment is managed by pixi — the prefix is the empty
+    string, with no trailing space.
     """
     config = AttrsDict(config)
+
+    if not _uses_execenv(config):
+        return "" if as_string else ([], {})
 
     cmdline = []
     cmdenv = {}
@@ -143,9 +160,16 @@ def execenv_pyexe(
 
     Note
     ----
-    If *as_string* is ``True``, a space is appended to the returned string.
+    If *as_string* is ``True``, a space is appended to the returned string
+    (in every mode). When *config* has no (non-empty) ``execenv`` section —
+    i.e. the cycle's software environment is managed by pixi — the bare
+    executable name is returned and resolves from the ambient environment's
+    ``PATH``.
     """
     config = AttrsDict(config)
+
+    if not _uses_execenv(config):
+        return f"{exename} " if as_string else ([exename], {})
 
     cmdline, cmdenv = execenv_prefix(config, as_string=False)
     cmdline.append(f"{config.paths.install}/bin/{exename}")
@@ -285,6 +309,20 @@ def install(args) -> None:
         config_dict, var_values={"_": config_loc}, use_env=True, ignore_missing=False
     )
 
+    if not _uses_execenv(config_dict):
+        msg = (
+            f"{args.config_file} has no 'execenv' section: this production "
+            "cycle's software environment is managed by pixi. Run "
+            "'pixi install' (or 'pixi shell') in the cycle directory instead."
+        )
+        raise SystemExit(msg)
+
+    log.warning(
+        "'dataflow install' is deprecated in favour of managing the cycle's "
+        "software environment with pixi (https://pixi.sh): drop the 'execenv' "
+        "section from the config and run 'pixi install' instead"
+    )
+
     config_dict["execenv"] = _select_execenv(config_dict, args.system, args.config_file)
 
     # path to virtualenv location
@@ -388,6 +426,21 @@ def cmdexec(args) -> None:
         use_env=True,
         ignore_missing=False,
     )
+
+    if not _uses_execenv(config_dict):
+        # pixi-managed cycle: no container prefix and no cycle virtualenv,
+        # just run the command in the ambient (pixi) environment
+        msg = "running: " + " ".join(args.command)
+        log.debug(msg)
+        subprocess.run(args.command, check=True)
+        return
+
+    log.warning(
+        "'dataflow exec' is deprecated in favour of managing the cycle's "
+        "software environment with pixi (https://pixi.sh): drop the 'execenv' "
+        "section from the config and use 'pixi run' instead"
+    )
+
     config_dict["execenv"] = _select_execenv(config_dict, args.system, args.config_file)
 
     exe_path = Path(config_dict.paths.install).resolve() / "bin"
