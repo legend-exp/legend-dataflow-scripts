@@ -12,20 +12,32 @@ from dbetto import TextDB
 from dbetto.catalog import Catalog
 
 
-def _dir_state_digest(validity_path: Path) -> str:
-    """Digest of the directory contents (paths, mtimes, sizes) plus the dbetto
-    version, identifying one compiled state of the catalog."""
-    state = [version("dbetto"), str(validity_path.resolve())]
+def _content_digest(validity_path: Path) -> str:
+    """Digest of the directory contents (relative path, mtime and size of
+    every file) plus the dbetto version, identifying one compiled state of
+    the catalog."""
+    state = [version("dbetto")]
     for f in sorted(validity_path.rglob("*")):
         if f.is_file():
             st = f.stat()
-            state.append(f"{f.relative_to(validity_path)}:{st.st_mtime}:{st.st_size}")
+            state.append(
+                f"{f.relative_to(validity_path)}:{st.st_mtime_ns}:{st.st_size}"
+            )
     return hashlib.sha256("\n".join(state).encode()).hexdigest()[:16]
 
 
-def _cache_dir() -> Path:
+def _cache_dir(validity_path: Path) -> Path:
+    """Per-directory cache namespace, keyed on the resolved directory path, so
+    same-named directories in different locations cannot evict each other's
+    pickles."""
     base = os.environ.get("XDG_CACHE_HOME") or str(Path.home() / ".cache")
-    return Path(base) / "legend-dataflow" / "precompiled-catalogs"
+    dir_key = hashlib.sha256(str(validity_path.resolve()).encode()).hexdigest()[:16]
+    return (
+        Path(base)
+        / "legend-dataflow"
+        / "precompiled-catalogs"
+        / f"{validity_path.name}-{dir_key}"
+    )
 
 
 def pre_compile_catalog(validity_path: str | Path):
@@ -39,8 +51,9 @@ def pre_compile_catalog(validity_path: str | Path):
     invocation.
 
     The compiled catalog is cached on disk under
-    ``$XDG_CACHE_HOME/legend-dataflow/precompiled-catalogs``, keyed on the
-    directory contents (file mtimes/sizes) and the dbetto version, so repeated
+    ``$XDG_CACHE_HOME/legend-dataflow/precompiled-catalogs``, in a
+    subdirectory per (resolved) input directory, keyed on the directory
+    contents (file mtimes/sizes) and the dbetto version, so repeated
     workflow parses skip the eager compilation entirely.
 
     Parameters
@@ -57,13 +70,16 @@ def pre_compile_catalog(validity_path: str | Path):
     if isinstance(validity_path, str):
         validity_path = Path(validity_path)
 
-    digest = _dir_state_digest(validity_path)
-    cache_file = _cache_dir() / f"{validity_path.name}-{digest}.pkl"
-    if cache_file.is_file():
+    cache_dir = _cache_dir(validity_path)
+    cache_file = cache_dir / f"{_content_digest(validity_path)}.pkl"
+    if cache_file.is_file() and not cache_file.is_symlink():
         try:
             with cache_file.open("rb") as f:
-                return pickle.load(f)
-        except Exception:  # corrupt/stale pickle: rebuild below
+                cached = pickle.load(f)
+            # tampered/corrupt caches must never be handed back as a catalog
+            if isinstance(cached, Catalog):
+                return cached
+        except Exception:  # unreadable pickle: rebuild below
             pass
 
     catalog = Catalog.read_from(validity_path / "validity.yaml")
@@ -80,10 +96,10 @@ def pre_compile_catalog(validity_path: str | Path):
     compiled = Catalog(entries)
 
     try:
-        cache_file.parent.mkdir(parents=True, exist_ok=True)
-        for stale in cache_file.parent.glob(f"{validity_path.name}-*.pkl"):
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        for stale in cache_dir.glob("*.pkl"):
             stale.unlink(missing_ok=True)
-        fd, tmp_name = tempfile.mkstemp(dir=cache_file.parent, suffix=".tmp")
+        fd, tmp_name = tempfile.mkstemp(dir=cache_dir, suffix=".tmp")
         try:
             with os.fdopen(fd, "wb") as f:
                 pickle.dump(compiled, f, protocol=pickle.HIGHEST_PROTOCOL)
