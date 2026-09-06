@@ -185,7 +185,7 @@ def test_alias_table_annotated_root(tmp_path):
     """Aliasing into a new top-level group of a file whose root is a struct."""
     lh5_file = tmp_path / "test.lh5"
     with h5py.File(lh5_file, "w") as f:
-        for rawid, det in (("ch1027200", "V02160A"), ("ch1027201", "V02162B")):
+        for rawid in ("ch1027200", "ch1027201"):
             grp = f.create_group(f"{rawid}/dsp")
             grp.attrs["datatype"] = "table{a}"
             grp.create_dataset("a", data=[1, 2, 3])
