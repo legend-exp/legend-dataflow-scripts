@@ -3,7 +3,8 @@ from __future__ import annotations
 import argparse
 import time
 import warnings
-from multiprocessing import Pool
+from concurrent.futures import ProcessPoolExecutor
+from multiprocessing import get_context
 from pathlib import Path
 
 import lh5
@@ -51,7 +52,7 @@ def build_dsp_wrapper(kwargs):
     """Unpack *kwargs* and delegate to :func:`dspeed.build_dsp`.
 
     This thin wrapper exists so that a single-argument callable can be passed
-    to :meth:`multiprocessing.Pool.map`.
+    to :meth:`concurrent.futures.Executor.map`.
 
     Parameters
     ----------
@@ -239,10 +240,12 @@ def build_tier_dsp() -> None:
             }
             process_kwargs_list.append(kwargs)
 
-        # Create a multiprocessing pool
-        with Pool(processes=args.n_processes) as pool:
-            # Use starmap to pass multiple arguments to the process function
-            pool.map(build_dsp_wrapper, process_kwargs_list)
+        # fork pinned: default start method changes in py3.14
+        # a killed worker raises BrokenProcessPool here; Pool.map would hang forever
+        with ProcessPoolExecutor(
+            max_workers=args.n_processes, mp_context=get_context("fork")
+        ) as pool:
+            list(pool.map(build_dsp_wrapper, process_kwargs_list))
 
         # merge the DSPs
         log.info("Merging DSPs")
