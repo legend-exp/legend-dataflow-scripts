@@ -4,6 +4,7 @@ import argparse
 import time
 import warnings
 from concurrent.futures import ProcessPoolExecutor
+from multiprocessing import get_context
 from pathlib import Path
 
 import lh5
@@ -239,8 +240,11 @@ def build_tier_dsp() -> None:
             }
             process_kwargs_list.append(kwargs)
 
+        # fork pinned: default start method changes in py3.14
         # a killed worker raises BrokenProcessPool here; Pool.map would hang forever
-        with ProcessPoolExecutor(max_workers=args.n_processes) as pool:
+        with ProcessPoolExecutor(
+            max_workers=args.n_processes, mp_context=get_context("fork")
+        ) as pool:
             list(pool.map(build_dsp_wrapper, process_kwargs_list))
 
         # merge the DSPs
