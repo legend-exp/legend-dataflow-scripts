@@ -133,6 +133,34 @@ def get_out_data(
     return out_tbl, int(np.count_nonzero(final_mask))
 
 
+def initial_bin_width(energy):
+    """
+    Freedman-Diaconis starting bin width for the peak-finding histogram.
+
+    Parameters
+    ----------
+    energy : numpy.ndarray
+        uncalibrated energies of the candidate events.
+
+    Returns
+    -------
+    float or None
+        bin width capped at 2 ADC, or ``None`` when the sample is degenerate
+        (fewer than two finite values, or no spread) and no histogram can be built.
+    """
+    energy = energy[np.isfinite(energy)]
+    if len(energy) < 2:
+        return None
+    width = (
+        2
+        * (np.percentile(energy, 75) - np.percentile(energy, 25))
+        * len(energy) ** (-1 / 3)
+    )
+    if not width > 0:
+        return None
+    return min(width, 2)
+
+
 def build_peak_dicts(peaks_kev, kev_widths, masks, log=None):
     """Build the per-peak accumulator state for the file x peak read loop.
 
@@ -455,16 +483,17 @@ def par_geds_dsp_evtsel() -> None:
                             )
                             energy = tb_out[energy_parameter].nda
 
-                            init_bin_width = (
-                                2
-                                * (
-                                    np.nanpercentile(energy, 75)
-                                    - np.nanpercentile(energy, 25)
+                            init_bin_width = initial_bin_width(energy)
+                            if init_bin_width is None:  # too few events to histogram
+                                msg = (
+                                    f"{peak}: only {np.isfinite(energy).sum()} "
+                                    "usable events, skipping peak"
                                 )
-                                * len(energy) ** (-1 / 3)
-                            )
-
-                            init_bin_width = min(init_bin_width, 2)
+                                log.warning(msg)
+                                peak_dict["obj_buf"] = None
+                                peak_dict["obj_buf_start"] = 0
+                                peak_dict["idxs"] = None
+                                continue
 
                             hist, bins, var = pgh.get_hist(
                                 energy,

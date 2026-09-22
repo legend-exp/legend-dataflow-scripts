@@ -2,7 +2,8 @@
 
 Covers ``build_peak_dicts`` (which drops peaks with no candidate events, so a
 channel whose DAQ threshold sits above a configured gamma line does not hand
-``None`` to ``build_dsp``) and ``require_peaks_present`` (which makes the peak
+``None`` to ``build_dsp``), ``initial_bin_width`` (which flags peak samples
+too degenerate to histogram) and ``require_peaks_present`` (which makes the peak
 file consumers fail loudly instead of filtering down to zero rows).
 """
 
@@ -11,7 +12,10 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from legenddataflowscripts.par.geds.dsp.evtsel import build_peak_dicts
+from legenddataflowscripts.par.geds.dsp.evtsel import (
+    build_peak_dicts,
+    initial_bin_width,
+)
 from legenddataflowscripts.utils import require_peaks_present
 
 PEAKS = [583.191, 727.33, 860.564, 1620.5, 2614.553]
@@ -81,3 +85,32 @@ def test_require_peaks_present_lists_all_missing():
 def test_require_peaks_present_names_the_context():
     with pytest.raises(ValueError, match=r"my-peaks\.lh5"):
         require_peaks_present(np.array([2614]), [583], "peak file my-peaks.lh5")
+
+
+def test_initial_bin_width_normal_sample():
+    rng = np.random.default_rng(1)
+    energy = rng.normal(5000, 5, 10000)
+    width = initial_bin_width(energy)
+    iqr = np.percentile(energy, 75) - np.percentile(energy, 25)
+    assert width == pytest.approx(2 * iqr * len(energy) ** (-1 / 3))
+    assert 0 < width <= 2
+
+
+def test_initial_bin_width_is_capped():
+    energy = np.linspace(0, 1e6, 100)
+    assert initial_bin_width(energy) == 2
+
+
+@pytest.mark.parametrize(
+    "energy",
+    [
+        np.array([3444.2]),
+        np.array([]),
+        np.array([np.nan, np.nan, np.nan]),
+        np.full(50, 1234.5),
+        np.array([1234.5, np.nan, 1234.5]),
+    ],
+    ids=["single-event", "empty", "all-nan", "constant", "constant-with-nan"],
+)
+def test_initial_bin_width_degenerate(energy):
+    assert initial_bin_width(energy) is None
