@@ -155,6 +155,12 @@ def test_get_rule_config(configs_tree):
     config = get_rule_config(configs_tree, "tier_tcm", "20230201T000000Z", "cal")
     assert config["inputs"]["config"] == "c.yaml"
 
+    # writable, and edits don't leak into the next call
+    config["inputs"]["config"] = "other.yaml"
+    config["inputs"].setdefault("extra", []).append(1)
+    again = get_rule_config(configs_tree, "tier_tcm", "20230201T000000Z", "cal")
+    assert again["inputs"] == {"config": "c.yaml"}
+
     with pytest.raises(KeyError, match=r"no snakemake_rules\.tier_dsp entry"):
         get_rule_config(configs_tree, "tier_dsp", "20230201T000000Z", "cal")
 
