@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 from collections.abc import Iterable, Mapping
 from pathlib import Path
 
@@ -133,14 +134,15 @@ def get_rule_config(configs_path, rule_name, timestamp, datatype):
 
     Wraps ``TextDB(...).on(...)["snakemake_rules"][rule_name]`` so that a
     missing key names the rule, timestamp, datatype and config path instead
-    of raising a bare :class:`KeyError`.
+    of raising a bare :class:`KeyError`. Returns a writable deep copy, since
+    ``TextDB.on()`` results are shared and read-only.
     """
     if not Path(configs_path).is_dir():
         msg = f"config directory {configs_path} does not exist"
         raise FileNotFoundError(msg)
     configs = TextDB(configs_path, lazy=True).on(timestamp, category=datatype)
     try:
-        return configs["snakemake_rules"][rule_name]
+        return copy.deepcopy(configs["snakemake_rules"][rule_name])
     except KeyError as err:
         msg = (
             f"config resolved from {configs_path} for timestamp {timestamp} "
