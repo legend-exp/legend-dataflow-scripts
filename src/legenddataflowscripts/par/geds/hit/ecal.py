@@ -5,7 +5,7 @@ import copy
 import inspect
 import pickle as pkl
 import warnings
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 import lh5
@@ -26,6 +26,7 @@ from ....utils import (
     build_log,
     check_pulser_mask,
     convert_dict_np_to_float,
+    data_for,
     expand_filelist,
     get_pulser_mask,
     prepare_output_paths,
@@ -42,6 +43,91 @@ except AttributeError:  # np < 2
     warnings.filterwarnings(action="ignore", category=np.RankWarning)
 
 
+def _time_edges(data, time_dx):
+    """Time bin edges covering *data*, aligned to multiples of *time_dx*."""
+    return np.arange(
+        (np.amin(data["timestamp"]) // time_dx) * time_dx,
+        ((np.amax(data["timestamp"]) // time_dx) + 2) * time_dx,
+        time_dx,
+    )
+
+
+def _timemap(timestamps, values, time_edges, value_edges):
+    """2D time-vs-value histogram as a data dict."""
+    counts, _, _ = np.histogram2d(timestamps, values, bins=[time_edges, value_edges])
+    return {
+        "counts": counts.astype(np.int64),
+        "time_edges": time_edges,
+        "value_edges": value_edges,
+    }
+
+
+def _draw_timemap(hist, ylabel, ylim=None):
+    """Draw a timemap data dict (see :func:`_timemap`) as a log-scaled 2D histogram."""
+    fig = plt.figure()
+    if len(hist) > 0:
+        plt.pcolormesh(
+            hist["time_edges"], hist["value_edges"], hist["counts"].T, norm=LogNorm()
+        )
+        if ylim is not None:
+            plt.ylim(ylim)
+    ticks, _ = plt.xticks()
+    plt.xlabel(
+        f"Time starting : {datetime.fromtimestamp(ticks[0], UTC).strftime('%d/%m/%y %H:%M')}"
+    )
+    plt.ylabel(ylabel)
+    plt.xticks(
+        ticks,
+        [datetime.fromtimestamp(tick, UTC).strftime("%H:%M") for tick in ticks],
+    )
+    plt.close()
+    return fig
+
+
+def bin_2614_timemap(
+    data,
+    cal_energy_param,
+    selection_string,
+    erange=(2580, 2630),
+    dx=1,
+    time_dx=180,
+):
+    """Bin a 2D time-vs-energy histogram centred on the 2614 keV line.
+
+    Parameters
+    ----------
+    data : pandas.DataFrame
+        Event-level data with columns *cal_energy_param* and ``timestamp``.
+    cal_energy_param : str
+        Name of the calibrated energy column.
+    selection_string : str
+        Pandas query string applied to select physics events.
+    erange : tuple of float
+        Energy range ``(low, high)`` in keV.  Defaults to ``(2580, 2630)``.
+    dx : float
+        Energy bin width in keV.  Defaults to ``1``.
+    time_dx : float
+        Time bin width in seconds.  Defaults to ``180``.
+
+    Returns
+    -------
+    dict
+        ``{"counts" (n_time, n_energy), "time_edges", "value_edges"}``, or an
+        empty dict when no events are selected.
+    """
+    selection = data.query(
+        f"{cal_energy_param}>2560&{cal_energy_param}<2660&{selection_string}"
+    )
+    if len(selection) == 0:
+        return {}
+    return _timemap(
+        selection["timestamp"],
+        selection[cal_energy_param],
+        _time_edges(data, time_dx),
+        np.arange(erange[0], erange[1] + dx, dx),
+    )
+
+
 def plot_2614_timemap(
     data,
     cal_energy_param,
@@ -52,7 +138,7 @@ def plot_2614_timemap(
     dx=1,
     time_dx=180,
 ):
-    """Plot a 2D time-vs-energy histogram centred on the 2614 keV line.
+    """Plot the 2614 keV time-vs-energy histogram of :func:`bin_2614_timemap`.
 
     Parameters
     ----------
@@ -80,47 +166,67 @@ def plot_2614_timemap(
     """
     plt.rcParams["figure.figsize"] = figsize
     plt.rcParams["font.size"] = fontsize
-
-    selection = data.query(
-        f"{cal_energy_param}>2560&{cal_energy_param}<2660&{selection_string}"
+    hist = bin_2614_timemap(
+        data, cal_energy_param, selection_string, erange, dx, time_dx
     )
-
-    fig = plt.figure()
-    if len(selection) == 0:
-        pass
-    else:
-        time_bins = np.arange(
-            (np.amin(data["timestamp"]) // time_dx) * time_dx,
-            ((np.amax(data["timestamp"]) // time_dx) + 2) * time_dx,
-            time_dx,
-        )
-
-        plt.hist2d(
-            selection["timestamp"],
-            selection[cal_energy_param],
-            bins=[time_bins, np.arange(erange[0], erange[1] + dx, dx)],
-            norm=LogNorm(),
-        )
-
-    ticks, _ = plt.xticks()
-    plt.xlabel(
-        f"Time starting : {datetime.utcfromtimestamp(ticks[0]).strftime('%d/%m/%y %H:%M')}"
-    )
-    plt.ylabel("Energy(keV)")
-    plt.ylim([erange[0], erange[1]])
-
-    plt.xticks(
-        ticks,
-        [datetime.utcfromtimestamp(tick).strftime("%H:%M") for tick in ticks],
-    )
-    plt.close()
+    fig = _draw_timemap(hist, "Energy(keV)")
+    fig.axes[0].set_ylim([erange[0], erange[1]])
     return fig
+
+
+def bin_pulser_timemap(
+    data,
+    cal_energy_param,
+    selection_string,  # noqa: ARG001
+    pulser_field="is_pulser",
+    dx=0.2,
+    time_dx=180,
+    n_spread=3,
+):
+    """Bin a 2D time-vs-energy histogram for pulser events.
+
+    Parameters
+    ----------
+    data : pandas.DataFrame
+        Event-level data including the pulser flag column.
+    cal_energy_param : str
+        Name of the calibrated energy column.
+    selection_string : str
+        Unused; kept for a consistent plot-function signature.
+    pulser_field : str
+        Boolean column name identifying pulser events.  Defaults to
+        ``"is_pulser"``.
+    dx : float
+        Energy bin width in keV.
+    time_dx : float
+        Time bin width in seconds.
+    n_spread : int
+        Half-width of the energy axis in multiples of the 10th-50th percentile
+        spread.
+
+    Returns
+    -------
+    dict
+        ``{"counts" (n_time, n_energy), "time_edges", "value_edges"}``, or an
+        empty dict when there are no pulser events.
+    """
+    selection = data.query(pulser_field)
+    if len(selection) == 0:
+        return {}
+    mean = np.nanpercentile(selection[cal_energy_param], 50)
+    spread = mean - np.nanpercentile(selection[cal_energy_param], 10)
+    return _timemap(
+        selection["timestamp"],
+        selection[cal_energy_param],
+        _time_edges(data, time_dx),
+        np.arange(mean - n_spread * spread, mean + n_spread * spread + dx, dx),
+    )
 
 
 def plot_pulser_timemap(
     data,
     cal_energy_param,
-    selection_string,  # noqa: ARG001
+    selection_string,
     pulser_field="is_pulser",
     figsize=(8, 6),
     fontsize=12,
@@ -128,7 +234,7 @@ def plot_pulser_timemap(
     time_dx=180,
     n_spread=3,
 ):
-    """Plot a 2D time-vs-energy histogram for pulser events.
+    """Plot the pulser time-vs-energy histogram of :func:`bin_pulser_timemap`.
 
     Parameters
     ----------
@@ -160,44 +266,16 @@ def plot_pulser_timemap(
     """
     plt.rcParams["figure.figsize"] = figsize
     plt.rcParams["font.size"] = fontsize
-
-    time_bins = np.arange(
-        (np.amin(data["timestamp"]) // time_dx) * time_dx,
-        ((np.amax(data["timestamp"]) // time_dx) + 2) * time_dx,
-        time_dx,
+    hist = bin_pulser_timemap(
+        data, cal_energy_param, selection_string, pulser_field, dx, time_dx, n_spread
     )
-
-    selection = data.query(pulser_field)
-    fig = plt.figure()
-    if len(selection) == 0:
-        pass
-
-    else:
-        mean = np.nanpercentile(selection[cal_energy_param], 50)
-        spread = mean - np.nanpercentile(selection[cal_energy_param], 10)
-
-        plt.hist2d(
-            selection["timestamp"],
-            selection[cal_energy_param],
-            bins=[
-                time_bins,
-                np.arange(mean - n_spread * spread, mean + n_spread * spread + dx, dx),
-            ],
-            norm=LogNorm(),
-        )
-        plt.ylim([mean - n_spread * spread, mean + n_spread * spread])
-    ticks, _ = plt.xticks()
-    plt.xlabel(
-        f"Time starting : {datetime.utcfromtimestamp(ticks[0]).strftime('%d/%m/%y %H:%M')}"
-    )
-    plt.ylabel("Energy(keV)")
-
-    plt.xticks(
-        ticks,
-        [datetime.utcfromtimestamp(tick).strftime("%H:%M") for tick in ticks],
-    )
-    plt.close()
-    return fig
+    ylim = None
+    if len(hist) > 0:
+        energy = data.query(pulser_field)[cal_energy_param]
+        mean = np.nanpercentile(energy, 50)
+        spread = mean - np.nanpercentile(energy, 10)
+        ylim = [mean - n_spread * spread, mean + n_spread * spread]
+    return _draw_timemap(hist, "Energy(keV)", ylim)
 
 
 def get_median(x):
@@ -430,6 +508,44 @@ def bin_survival_fraction(
     return {"bins": pgh.get_bin_centers(bins_pass), "sf": sf}
 
 
+def bin_baseline_timemap(
+    data,
+    parameter="bl_mean",
+    dx=1,
+    n_spread=5,
+    time_dx=180,
+):
+    """Bin a 2D time-vs-baseline histogram for monitoring baseline stability.
+
+    Parameters
+    ----------
+    data : pandas.DataFrame
+        Event-level data with columns *parameter* and ``timestamp``.
+    parameter : str
+        Name of the baseline parameter.  Defaults to ``"bl_mean"``.
+    dx : float
+        Baseline bin width (in ADC units).  Defaults to ``1``.
+    n_spread : int
+        Half-width of the baseline axis in multiples of the 10th-50th
+        percentile spread.  Defaults to ``5``.
+    time_dx : float
+        Time bin width in seconds.  Defaults to ``180``.
+
+    Returns
+    -------
+    dict
+        ``{"counts" (n_time, n_baseline), "time_edges", "value_edges"}``.
+    """
+    mean = np.nanpercentile(data[parameter], 50)
+    spread = mean - np.nanpercentile(data[parameter], 10)
+    return _timemap(
+        data["timestamp"],
+        data[parameter],
+        _time_edges(data, time_dx),
+        np.arange(mean - n_spread * spread, mean + n_spread * spread + dx, dx),
+    )
+
+
 def plot_baseline_timemap(
     data,
     figsize=(8, 6),
@@ -439,7 +555,7 @@ def plot_baseline_timemap(
     n_spread=5,
     time_dx=180,
 ):
-    """Plot a 2D time-vs-baseline histogram for monitoring detector baseline stability.
+    """Plot the time-vs-baseline histogram of :func:`bin_baseline_timemap`.
 
     Parameters
     ----------
@@ -466,39 +582,17 @@ def plot_baseline_timemap(
     """
     plt.rcParams["figure.figsize"] = figsize
     plt.rcParams["font.size"] = fontsize
-
-    time_bins = np.arange(
-        (np.amin(data["timestamp"]) // time_dx) * time_dx,
-        ((np.amax(data["timestamp"]) // time_dx) + 2) * time_dx,
-        time_dx,
-    )
-
     mean = np.nanpercentile(data[parameter], 50)
     spread = mean - np.nanpercentile(data[parameter], 10)
-    fig = plt.figure()
-    plt.hist2d(
-        data["timestamp"],
-        data[parameter],
-        bins=[
-            time_bins,
-            np.arange(mean - n_spread * spread, mean + n_spread * spread + dx, dx),
-        ],
-        norm=LogNorm(),
+    hist = bin_baseline_timemap(data, parameter, dx, n_spread, time_dx)
+    return _draw_timemap(
+        hist, "Baseline Value", [mean - n_spread * spread, mean + n_spread * spread]
     )
 
-    ticks, _ = plt.xticks()
-    plt.xlabel(
-        f"Time starting : {datetime.utcfromtimestamp(ticks[0]).strftime('%d/%m/%y %H:%M')}"
-    )
-    plt.ylabel("Baseline Value")
-    plt.ylim([mean - n_spread * spread, mean + n_spread * spread])
 
-    plt.xticks(
-        ticks,
-        [datetime.utcfromtimestamp(tick).strftime("%H:%M") for tick in ticks],
-    )
-    plt.close()
-    return fig
+plot_2614_timemap.data_func = bin_2614_timemap
+plot_pulser_timemap.data_func = bin_pulser_timemap
+plot_baseline_timemap.data_func = bin_baseline_timemap
 
 
 def bin_bl_stability(data, time_slice=180, parameter="bl_mean"):
@@ -604,10 +698,11 @@ def baseline_tracking_plots(files, lh5_path, plot_options=None):
         lh5_path, files, "pd", field_mask=["bl_mean", "baseline", "timestamp"]
     )
     for key, item in plot_options.items():
-        if item["options"] is not None:
-            plot_dict[key] = item["function"](data, **item["options"])
-        else:
-            plot_dict[key] = item["function"](data)
+        options = item["options"] or {}
+        plot_dict[key] = item["function"](data, **options)
+        plot_data = data_for(item["function"], data, **options)
+        if plot_data is not None:
+            plot_dict[f"{key}_data"] = plot_data
     return plot_dict
 
 
@@ -1075,22 +1170,18 @@ def par_geds_hit_ecal() -> None:
                 param_plot_dict["peak_fits"] = full_object_dict[
                     cal_energy_param
                 ].plot_fits(e_uncal)
+                param_plot_dict["peak_hists"] = full_object_dict[
+                    cal_energy_param
+                ].get_peak_hists(e_uncal)
 
                 if "plot_options" in kwarg_dict:
                     for key, item in kwarg_dict["plot_options"].items():
-                        if item["options"] is not None:
-                            param_plot_dict[key] = item["function"](
-                                data,
-                                cal_energy_param,
-                                selection_string,
-                                **item["options"],
-                            )
-                        else:
-                            param_plot_dict[key] = item["function"](
-                                data,
-                                cal_energy_param,
-                                selection_string,
-                            )
+                        plot_args = (data, cal_energy_param, selection_string)
+                        options = item["options"] or {}
+                        param_plot_dict[key] = item["function"](*plot_args, **options)
+                        plot_data = data_for(item["function"], *plot_args, **options)
+                        if plot_data is not None:
+                            param_plot_dict[f"{key}_data"] = plot_data
             plot_dict[cal_energy_param] = param_plot_dict
 
         for peak_dict in (

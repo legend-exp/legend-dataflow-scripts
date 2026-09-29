@@ -236,7 +236,7 @@ def run_aoe_calibration(
                 dt_corr=param_config.get("dt_corr", False),
                 dep_correct=param_config.get("dep_correct", False),
                 dt_cut=param_config.get("dt_cut", None),
-                dt_param=param_config.get("dt_param", 3),
+                dt_param=param_config.get("dt_param", "dt_eff"),
                 high_cut_val=param_config.get("high_cut_val", 3),
                 compt_bands_width=param_config.get(
                     "compt_bands_width", config.get("compt_bands_width", 20)
