@@ -114,7 +114,7 @@ def plot_dict_to_lgdo(plot_dict):
         if isinstance(obj, list | tuple):
             obj = np.asarray(obj)
         if isinstance(obj, np.ndarray) and obj.size and obj.dtype.kind in "biuf":
-            return Array(obj)
+            return Scalar(obj.item()) if obj.ndim == 0 else Array(obj)
         return None
 
     return convert(plot_dict)

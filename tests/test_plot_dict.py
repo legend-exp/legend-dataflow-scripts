@@ -37,7 +37,12 @@ def test_plot_dict_to_lgdo_round_trip(tmp_path):
             },
             "empty": {},
         },
-        "nopt": {"best_par": np.float64(4.5), "func": "gauss_on_step", "ok": True},
+        "nopt": {
+            "best_par": np.float64(4.5),
+            "best_val": np.array(2.5),
+            "func": "gauss_on_step",
+            "ok": True,
+        },
         "skipped": None,
     }
     plt.close(fig)
@@ -56,6 +61,7 @@ def test_plot_dict_to_lgdo_round_trip(tmp_path):
     )
     assert param["2614_timemap"]["counts"].nda.shape == (3, 2)
     assert out["nopt"]["best_par"].value == 4.5
+    assert out["nopt"]["best_val"].value == 2.5  # 0-d array -> Scalar
     assert out["nopt"]["ok"].value
 
 
