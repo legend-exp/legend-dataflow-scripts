@@ -467,20 +467,16 @@ def par_geds_dsp_eopt() -> None:
 
         # the optimiser plots only exist when the optimisation actually ran
         if run_eopt:
-            plot_dict["trap_optimisation"] = {
-                "kernel_space": bopt_trap.plot(init_samples=sample_x),
-                "acq_space": bopt_trap.plot_acq(init_samples=sample_x),
-            }
-
-            plot_dict["cusp_optimisation"] = {
-                "kernel_space": bopt_cusp.plot(init_samples=sample_x),
-                "acq_space": bopt_cusp.plot_acq(init_samples=sample_x),
-            }
-
-            plot_dict["zac_optimisation"] = {
-                "kernel_space": bopt_zac.plot(init_samples=sample_x),
-                "acq_space": bopt_zac.plot_acq(init_samples=sample_x),
-            }
+            for name, bopt in (
+                ("trap", bopt_trap),
+                ("cusp", bopt_cusp),
+                ("zac", bopt_zac),
+            ):
+                plot_dict[f"{name}_optimisation"] = {
+                    "kernel_space": bopt.plot(init_samples=sample_x),
+                    "acq_space": bopt.plot_acq(init_samples=sample_x),
+                    "data": bopt.get_plot_data(init_samples=sample_x),
+                }
 
         with Path(args.plot_path).open("wb") as w:
             pkl.dump(plot_dict, w, protocol=pkl.HIGHEST_PROTOCOL)
