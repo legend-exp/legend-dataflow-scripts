@@ -233,6 +233,7 @@ def par_geds_dsp_pz() -> None:
                 kwarg_dict.get("wf_pz_field", "wf_pz"),
                 norm_param=kwarg_dict.get("norm_param", "pz_mean"),
                 xlim=[0, len(tb_data[kwarg_dict["wf_field"]]["values"].nda[0])],
+                downsample=4,  # keeps the saved waveform sample small
             )
 
             zoomed = tau.plot_waveforms_after_correction(
@@ -244,6 +245,13 @@ def par_geds_dsp_pz() -> None:
             )
 
             plot_dict.update({"waveforms_zoomed": zoomed["waveforms"]})
+            # same waveforms as waveforms_data, so only save the zoom window
+            plot_dict["waveforms_zoomed_data"] = {
+                "xlim": np.array(
+                    [400, len(tb_data[kwarg_dict["wf_field"]]["values"].nda[0])]
+                ),
+                "ylim": np.array([0.8, 1.1]),
+            }
 
             plot_dict.update(
                 tau.plot_slopes(
