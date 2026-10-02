@@ -9,6 +9,7 @@ import time
 import warnings
 from pathlib import Path
 
+import matplotlib as mpl
 import numpy as np
 from dbetto.catalog import Props
 from lh5 import ls
@@ -27,6 +28,8 @@ from ....utils import (
     get_pulser_mask,
     prepare_output_paths,
 )
+
+mpl.use("agg")  # no display needed; avoids X11 when DISPLAY is set
 
 log = logging.getLogger(__name__)
 warnings.filterwarnings(action="ignore", category=RuntimeWarning)

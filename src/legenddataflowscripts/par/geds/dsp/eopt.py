@@ -7,6 +7,7 @@ import warnings
 from pathlib import Path
 
 import lh5
+import matplotlib as mpl
 import numpy as np
 import pygama.pargen.energy_optimisation as om  # noqa: F401
 import sklearn.gaussian_process.kernels as ker
@@ -26,6 +27,8 @@ from ....utils import (
     require_config_keys,
     require_peaks_present,
 )
+
+mpl.use("agg")  # no display needed; avoids X11 when DISPLAY is set
 
 warnings.filterwarnings(action="ignore", category=RuntimeWarning)
 try:
