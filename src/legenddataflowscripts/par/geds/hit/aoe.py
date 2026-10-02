@@ -10,6 +10,7 @@ import time
 import warnings
 from pathlib import Path
 
+import matplotlib as mpl
 import numpy as np
 from dbetto.catalog import Props
 from pygama.pargen.AoE_cal import *  # noqa: F403
@@ -27,6 +28,8 @@ from ....utils import (
     require_config_keys,
     require_unique_suffixes,
 )
+
+mpl.use("agg")  # no display needed; avoids X11 when DISPLAY is set
 
 log = logging.getLogger(__name__)
 
