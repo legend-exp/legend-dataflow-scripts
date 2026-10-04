@@ -18,7 +18,7 @@ from .files import (
 )
 from .lgdo_utils import take_table_rows
 from .log import build_log
-from .plot_dict import fill_plot_dict
+from .plot_dict import data_for, fill_plot_dict, lh5_key, plot_dict_to_lgdo
 from .pulser_removal import check_pulser_mask, get_pulser_mask
 
 __all__ = [
@@ -27,13 +27,16 @@ __all__ = [
     "check_input_files",
     "check_pulser_mask",
     "convert_dict_np_to_float",
+    "data_for",
     "expand_filelist",
     "fill_plot_dict",
     "get_channel_config",
     "get_is_recovering_mask",
     "get_pulser_mask",
     "get_rule_config",
+    "lh5_key",
     "parse_json_arg",
+    "plot_dict_to_lgdo",
     "prepare_output_paths",
     "require_config_keys",
     "require_peaks_present",
