@@ -6,6 +6,7 @@ import pickle as pkl
 from pathlib import Path
 
 import lh5
+import matplotlib as mpl
 import numpy as np
 from dbetto.catalog import Props
 from dspeed import build_dsp
@@ -23,6 +24,8 @@ from ....utils import (
     require_config_keys,
     take_table_rows,
 )
+
+mpl.use("agg")  # no display needed; avoids X11 when DISPLAY is set
 
 
 def par_geds_dsp_pz() -> None:
