@@ -516,7 +516,7 @@ def par_geds_dsp_evtsel() -> None:
                                 mu = peak_top_pars[0]
                                 if mu > np.nanmax(bins) or mu < np.nanmin(bins):
                                     raise ValueError
-                            except Exception:
+                            except (ValueError, TypeError, IndexError):
                                 mu = np.nan
                             if mu is None or np.isnan(mu):
                                 log.debug("Fit failed, using max guess")

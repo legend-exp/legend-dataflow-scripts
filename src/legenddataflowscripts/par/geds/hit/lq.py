@@ -14,8 +14,8 @@ import numpy as np
 import pandas as pd
 from dbetto.catalog import Props
 from pygama.math.distributions import gaussian
-from pygama.pargen.AoE_cal import *  # noqa: F403
-from pygama.pargen.lq_cal import *  # noqa: F403
+from pygama.pargen.AoE_cal import *
+from pygama.pargen.lq_cal import *
 from pygama.pargen.lq_cal import LQCal
 from pygama.pargen.utils import load_data
 

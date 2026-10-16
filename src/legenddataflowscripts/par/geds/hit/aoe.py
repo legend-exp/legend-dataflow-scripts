@@ -13,7 +13,7 @@ from pathlib import Path
 import matplotlib as mpl
 import numpy as np
 from dbetto.catalog import Props
-from pygama.pargen.AoE_cal import *  # noqa: F403
+from pygama.pargen.AoE_cal import *
 from pygama.pargen.AoE_cal import CalAoE
 from pygama.pargen.utils import load_data
 
