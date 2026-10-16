@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import os
 import pickle
 import tempfile
@@ -10,6 +11,8 @@ from pathlib import Path
 
 from dbetto import TextDB
 from dbetto.catalog import Catalog
+
+log = logging.getLogger(__name__)
 
 
 def _content_digest(validity_path: Path) -> str:
@@ -80,7 +83,7 @@ def pre_compile_catalog(validity_path: str | Path):
             if isinstance(cached, Catalog):
                 return cached
         except Exception:  # unreadable pickle: rebuild below
-            pass
+            log.debug("could not read catalog cache %s", cache_file, exc_info=True)
 
     catalog = Catalog.read_from(validity_path / "validity.yaml")
     entries = {}
@@ -108,6 +111,7 @@ def pre_compile_catalog(validity_path: str | Path):
             Path(tmp_name).unlink(missing_ok=True)
             raise
     except Exception:
-        pass  # caching is best-effort; a failed write must not break parsing
+        # caching is best-effort; a failed write must not break parsing
+        log.debug("could not write catalog cache %s", cache_file, exc_info=True)
 
     return compiled

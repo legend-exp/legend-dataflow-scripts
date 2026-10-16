@@ -5,7 +5,7 @@ import copy
 import inspect
 import pickle as pkl
 import warnings
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 import lh5
@@ -104,14 +104,14 @@ def plot_2614_timemap(
 
     ticks, _ = plt.xticks()
     plt.xlabel(
-        f"Time starting : {datetime.utcfromtimestamp(ticks[0]).strftime('%d/%m/%y %H:%M')}"
+        f"Time starting : {datetime.fromtimestamp(ticks[0], tz=UTC).strftime('%d/%m/%y %H:%M')}"
     )
     plt.ylabel("Energy(keV)")
     plt.ylim([erange[0], erange[1]])
 
     plt.xticks(
         ticks,
-        [datetime.utcfromtimestamp(tick).strftime("%H:%M") for tick in ticks],
+        [datetime.fromtimestamp(tick, tz=UTC).strftime("%H:%M") for tick in ticks],
     )
     plt.close()
     return fig
@@ -188,13 +188,13 @@ def plot_pulser_timemap(
         plt.ylim([mean - n_spread * spread, mean + n_spread * spread])
     ticks, _ = plt.xticks()
     plt.xlabel(
-        f"Time starting : {datetime.utcfromtimestamp(ticks[0]).strftime('%d/%m/%y %H:%M')}"
+        f"Time starting : {datetime.fromtimestamp(ticks[0], tz=UTC).strftime('%d/%m/%y %H:%M')}"
     )
     plt.ylabel("Energy(keV)")
 
     plt.xticks(
         ticks,
-        [datetime.utcfromtimestamp(tick).strftime("%H:%M") for tick in ticks],
+        [datetime.fromtimestamp(tick, tz=UTC).strftime("%H:%M") for tick in ticks],
     )
     plt.close()
     return fig
@@ -488,14 +488,14 @@ def plot_baseline_timemap(
 
     ticks, _ = plt.xticks()
     plt.xlabel(
-        f"Time starting : {datetime.utcfromtimestamp(ticks[0]).strftime('%d/%m/%y %H:%M')}"
+        f"Time starting : {datetime.fromtimestamp(ticks[0], tz=UTC).strftime('%d/%m/%y %H:%M')}"
     )
     plt.ylabel("Baseline Value")
     plt.ylim([mean - n_spread * spread, mean + n_spread * spread])
 
     plt.xticks(
         ticks,
-        [datetime.utcfromtimestamp(tick).strftime("%H:%M") for tick in ticks],
+        [datetime.fromtimestamp(tick, tz=UTC).strftime("%H:%M") for tick in ticks],
     )
     plt.close()
     return fig
@@ -683,7 +683,7 @@ def get_results_dict(ecal_class, data, cal_energy_param, selection_string):
 
     pk_dict = results_dict["peak_parameters"]
 
-    for _, dic in pk_dict.items():
+    for dic in pk_dict.values():
         dic["function"] = dic["function"].name
         dic["parameters"] = dic["parameters"].to_dict()
         dic["uncertainties"] = dic["uncertainties"].to_dict()
