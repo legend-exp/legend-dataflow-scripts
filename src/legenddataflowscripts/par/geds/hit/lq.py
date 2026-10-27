@@ -309,6 +309,8 @@ def run_lq_calibration(
                 ][configs["cal_energy_param"]]["eres_linear"]
             except KeyError:
                 lq_obj.eres_func = {}
+            for panel in getattr(lq_obj, "gauss_trends_hist", []):
+                panel.pop("model", None)  # nested fit func, can't pickle
             out_dicts[name] = out_dict
             lq_objs[name] = copy.deepcopy(lq_obj)
             lq_plot_dict[name] = copy.deepcopy(lq_plots)
