@@ -57,8 +57,14 @@ def get_results_dict(lq_class):
         "DEP_means": lq_class.timecorr_df.to_dict("index"),
         "rt_correction": lq_class.dt_fit_pars,
         "energy_correction": {
-            "mean": { "popt": lq_class.mean_cor_res["popt"], "perr": lq_class.mean_cor_res["perr"] },
-            "width": { "popt": lq_class.sig_cor_res["popt"], "perr": lq_class.sig_cor_res["perr"] },
+            "mean": {
+                "popt": lq_class.mean_cor_res["popt"],
+                "perr": lq_class.mean_cor_res["perr"],
+            },
+            "width": {
+                "popt": lq_class.sig_cor_res["popt"],
+                "perr": lq_class.sig_cor_res["perr"],
+            },
         },
         "cut_fit_pars": lq_class.cut_fit_pars.to_dict(),
         "cut_value": lq_class.cut_val,
