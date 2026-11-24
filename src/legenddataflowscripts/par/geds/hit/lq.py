@@ -49,13 +49,23 @@ def get_results_dict(lq_class):
     -------
     dict
         Results dictionary containing the calibration energy parameter, DEP
-        mean values per run, drift-time correction fit parameters, cut fit
-        parameters, cut value, and survival fractions.
+        mean values per run, drift-time correction fit parameters, energy-mean/width
+        correction fit parameters, cut fit parameters, cut value, and survival fractions.
     """
     return {
         "cal_energy_param": lq_class.cal_energy_param,
         "DEP_means": lq_class.timecorr_df.to_dict("index"),
         "rt_correction": lq_class.dt_fit_pars,
+        "energy_correction": {
+            "mean": {
+                "popt": lq_class.mean_cor_res["popt"],
+                "perr": lq_class.mean_cor_res["perr"],
+            },
+            "width": {
+                "popt": lq_class.sig_cor_res["popt"],
+                "perr": lq_class.sig_cor_res["perr"],
+            },
+        },
         "cut_fit_pars": lq_class.cut_fit_pars.to_dict(),
         "cut_value": lq_class.cut_val,
         "sfs": lq_class.low_side_sf.to_dict("index"),
@@ -65,7 +75,6 @@ def get_results_dict(lq_class):
 def lq_calibration(
     data: pd.DataFrame,
     cal_dicts: dict,
-    energy_param: str,
     cal_energy_param: str,
     dt_param: str,
     eres_func: callable,
@@ -79,8 +88,7 @@ def lq_calibration(
 ):
     """Calibrate the LQ (late-charge) pulse-shape discriminant.
 
-    Constructs a :class:`~pygama.pargen.lq_cal.LQCal` instance, computes the
-    energy-normalised LQ observable ``LQ_Ecorr = lq_param / energy_param``, and
+    Constructs a :class:`~pygama.pargen.lq_cal.LQCal` instance, and
     calls :meth:`~pygama.pargen.lq_cal.LQCal.calibrate`.  The resulting cut
     expressions are appended to *cal_dicts*.
 
@@ -92,8 +100,6 @@ def lq_calibration(
     cal_dicts : dict
         Mapping of run timestamps → hit-level calibration operations.
         Updated in-place with the LQ cut expression.
-    energy_param : str
-        Raw (uncalibrated) energy parameter name used for LQ normalisation.
     cal_energy_param : str
         Calibrated energy parameter name.
     dt_param : str
@@ -119,7 +125,7 @@ def lq_calibration(
         pygama does not support it.
     suffix : str, optional
         Appended (underscore-separated) to all output parameter names, e.g.
-        ``suffix="foo"`` produces ``LQ_Ecorr_foo`` … ``LQ_Cut_foo``.  Lets
+        ``suffix="foo"`` produces ``LQ_over_E_foo`` … ``LQ_Cut_foo``.  Lets
         several LQ parameters be calibrated side by side without their
         hit-level operations colliding.  Requires a pygama version whose
         :meth:`~pygama.pargen.lq_cal.LQCal.calibrate` supports ``suffix``.
@@ -151,19 +157,7 @@ def lq_calibration(
         **({"use_log_pdf": True} if use_log_pdf else {}),
     )
 
-    initial_param = "LQ_Ecorr" if suffix is None else f"LQ_Ecorr_{suffix}"
-    data[initial_param] = np.divide(data[lq_param], data[energy_param])
-
-    lq.update_cal_dicts(
-        {
-            initial_param: {
-                "expression": f"{lq_param}/{energy_param}",
-                "parameters": {},
-            }
-        }
-    )
-
-    lq.calibrate(data, initial_param, **({} if suffix is None else {"suffix": suffix}))
+    lq.calibrate(data, lq_param, **({} if suffix is None else {"suffix": suffix}))
     return cal_dicts, get_results_dict(lq), fill_plot_dict(lq, data, plot_options), lq
 
 
@@ -288,7 +282,6 @@ def run_lq_calibration(
             cal_dicts, out_dict, lq_plots, lq_obj = lq_calibration(
                 data,
                 cal_dicts=cal_dicts,
-                energy_param=param_config["energy_param"],
                 cal_energy_param=configs["cal_energy_param"],
                 dt_param=param_config.get("dt_param", "dt_eff"),
                 eres_func=eres_func,
